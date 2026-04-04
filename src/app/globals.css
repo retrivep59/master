@@ -1,13 +1,12 @@
 @import "tailwindcss";
 
 :root {
-  --background: #030712;
-  --foreground: #f9fafb;
-  /* Safe area insets for notched phones */
-  --sat: env(safe-area-inset-top);
-  --sar: env(safe-area-inset-right);
-  --sab: env(safe-area-inset-bottom);
-  --sal: env(safe-area-inset-left);
+  --bg-deep:    #080008;
+  --bg-card:    #100010;
+  --bg-surface: #180018;
+  --accent:     #c0006a;
+  --accent2:    #7a00c0;
+  --glow:       rgba(192, 0, 106, 0.35);
 }
 
 * {
@@ -16,47 +15,36 @@
 }
 
 html {
-  /* Prevent font scaling in landscape on iOS */
   -webkit-text-size-adjust: 100%;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
+  background: var(--bg-deep);
+  color: #f0e6f0;
   font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   overscroll-behavior: none;
-  /* Account for notch / home indicator */
   padding-left: env(safe-area-inset-left);
   padding-right: env(safe-area-inset-right);
 }
 
-/* Hide scrollbar but keep scrollable */
-.scrollbar-none {
-  -ms-overflow-style: none;
-  scrollbar-width: none;
-}
-.scrollbar-none::-webkit-scrollbar {
-  display: none;
+/* Scrollbars */
+.scrollbar-none { -ms-overflow-style: none; scrollbar-width: none; }
+.scrollbar-none::-webkit-scrollbar { display: none; }
+
+/* Touch */
+button, a, [role="button"] { min-height: 44px; min-width: 44px; }
+button { touch-action: manipulation; }
+.overflow-x-auto, .overflow-y-auto { -webkit-overflow-scrolling: touch; }
+video { max-width: 100%; height: auto; }
+
+/* Ambient glow on cards */
+.glow-card {
+  box-shadow: 0 0 30px rgba(192, 0, 106, 0.12), inset 0 1px 0 rgba(255,255,255,0.04);
 }
 
-/* Minimum touch target size */
-button, a, [role="button"] {
-  min-height: 44px;
-  min-width: 44px;
+/* Pulse animation for hot badge */
+@keyframes hotpulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
 }
-
-/* Smooth scroll on iOS */
-.overflow-x-auto, .overflow-y-auto {
-  -webkit-overflow-scrolling: touch;
-}
-
-/* Prevent double-tap zoom on buttons */
-button {
-  touch-action: manipulation;
-}
-
-/* Video fills container on mobile */
-video {
-  max-width: 100%;
-  height: auto;
-}
+.hot-pulse { animation: hotpulse 2s ease-in-out infinite; }

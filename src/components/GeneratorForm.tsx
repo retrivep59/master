@@ -29,21 +29,11 @@ export default function GeneratorForm() {
     setActiveTemplateId(templateId);
   };
 
-  const handleSettingsChange = (newSettings: VideoSettingsValues) => {
-    setSettings(newSettings);
-    setActiveTemplateId(null); // clear template when user manually tweaks
-  };
-
   const handleGenerate = async () => {
-    if (!imageUrl) {
-      alert("Please upload or provide an image first.");
-      return;
-    }
-
+    if (!imageUrl) return;
     setLoading(true);
     setError(null);
     setVideoUrl(null);
-
     try {
       const res = await fetch("/api/generate", {
         method: "POST",
@@ -57,90 +47,66 @@ export default function GeneratorForm() {
           decodeChunkSize: settings.decodeChunkSize,
         }),
       });
-
       const data = await res.json();
-
-      if (!res.ok || data.error) {
-        throw new Error(data.error || "Generation failed");
-      }
-
+      if (!res.ok || data.error) throw new Error(data.error || "Generation failed");
       const url = Array.isArray(data.output) ? data.output[0] : data.output;
       setVideoUrl(url);
       setGenerationCount((c) => c + 1);
     } catch (err: unknown) {
-      const message =
-        err instanceof Error ? err.message : "An unexpected error occurred";
-      setError(message);
+      setError(err instanceof Error ? err.message : "An unexpected error occurred");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="space-y-6">
-      {/* Template Gallery — full width */}
-      <div className="bg-gray-900/50 border border-gray-800 rounded-2xl p-5">
-        <TemplateGallery
-          onSelect={handleTemplateSelect}
-          activeTemplateId={activeTemplateId}
-        />
+    <div className="space-y-5">
+      {/* Templates */}
+      <div className="rounded-2xl p-4" style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(192,0,106,0.15)" }}>
+        <TemplateGallery onSelect={handleTemplateSelect} activeTemplateId={activeTemplateId} />
       </div>
 
-      {/* Generator — 2 col */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Left: Controls */}
-        <div className="space-y-5">
+      {/* Generator grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+        <div className="space-y-4">
           <ImageUploader
-            onImageSelected={(url) => {
-              setImageUrl(url || null);
-              setVideoUrl(null);
-              setError(null);
-            }}
+            onImageSelected={(url) => { setImageUrl(url || null); setVideoUrl(null); setError(null); }}
             currentImage={imageUrl}
           />
 
-          <VideoSettings values={settings} onChange={handleSettingsChange} />
+          <VideoSettings values={settings} onChange={(s) => { setSettings(s); setActiveTemplateId(null); }} />
 
           <button
             onClick={handleGenerate}
             disabled={loading || !imageUrl}
-            className="w-full flex items-center justify-center gap-2.5 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 disabled:from-gray-700 disabled:to-gray-700 disabled:cursor-not-allowed text-white font-semibold py-3.5 px-6 rounded-xl transition-all duration-200 shadow-lg shadow-purple-900/30 text-base"
+            className="w-full flex items-center justify-center gap-2.5 text-white font-black py-4 px-6 rounded-xl transition-all active:scale-95 text-base disabled:opacity-40 disabled:cursor-not-allowed"
+            style={{
+              background: loading || !imageUrl ? "rgba(255,255,255,0.06)" : "linear-gradient(135deg, #c0006a, #7a00c0)",
+              boxShadow: loading || !imageUrl ? "none" : "0 0 30px rgba(192,0,106,0.4)",
+            }}
           >
             {loading ? (
               <>
-                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                Generating...
+                <div className="w-5 h-5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                Generating…
               </>
             ) : (
               <>
                 <Sparkles className="w-5 h-5" />
-                Generate Video
-                {activeTemplateId && (
-                  <span className="ml-1 text-purple-200 text-sm font-normal opacity-80">
-                    with template
-                  </span>
-                )}
+                {activeTemplateId ? "🔥 Generate with Style" : "Generate Video"}
               </>
             )}
           </button>
 
           {generationCount > 0 && (
-            <p className="text-center text-gray-500 text-sm">
-              <Zap className="inline w-3.5 h-3.5 mr-1 text-yellow-500" />
+            <p className="text-center text-xs" style={{ color: "#7a4a7a" }}>
+              <Zap className="inline w-3 h-3 mr-1" style={{ color: "#c0006a" }} />
               {generationCount} video{generationCount !== 1 ? "s" : ""} generated this session
             </p>
           )}
         </div>
 
-        {/* Right: Output */}
-        <div>
-          <VideoOutput
-            videoUrl={videoUrl}
-            loading={loading}
-            error={error}
-            onRegenerate={handleGenerate}
-          />
-        </div>
+        <VideoOutput videoUrl={videoUrl} loading={loading} error={error} onRegenerate={handleGenerate} />
       </div>
     </div>
   );
