@@ -4,8 +4,7 @@
  * HF SVD returns a raw binary MP4 blob — we convert it to a base64
  * data URL so the frontend can use it directly in <video src="...">.
  *
- * Model: stabilityai/stable-video-diffusion-img2vid-xt
- * Docs: https://huggingface.co/stabilityai/stable-video-diffusion-img2vid-xt
+ * Setup: add HUGGINGFACE_API_TOKEN=hf_... to .env.local and restart server.
  */
 
 const HF_API_URL =
@@ -27,15 +26,19 @@ export async function generateVideoHF(
   params: SVDParams = {}
 ): Promise<string> {
   const token = process.env.HUGGINGFACE_API_TOKEN;
-  if (!token) throw new Error("HUGGINGFACE_API_TOKEN is not set");
 
-  // HF SVD accepts base64 image input or a URL string as `inputs`
+  if (!token) {
+    throw new Error(
+      "HUGGINGFACE_API_TOKEN is not set. Add it to .env.local and restart the dev server with: npm run dev"
+    );
+  }
+
   const response = await fetch(HF_API_URL, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${token}`,
       "Content-Type": "application/json",
-      "X-Wait-For-Model": "true", // wait instead of 503 on cold start
+      "X-Wait-For-Model": "true",
     },
     body: JSON.stringify({
       inputs: imageUrl,
@@ -49,18 +52,16 @@ export async function generateVideoHF(
   });
 
   if (!response.ok) {
-    // Try to parse HF error body
-    let errMsg = `HF API error ${response.status}`;
+    let errMsg = `HuggingFace API error ${response.status}`;
     try {
       const errBody = (await response.json()) as { error?: string };
       if (errBody.error) errMsg = errBody.error;
     } catch {
-      // ignore parse failure
+      // ignore JSON parse failure
     }
     throw new Error(errMsg);
   }
 
-  // HF returns raw binary video data
   const arrayBuffer = await response.arrayBuffer();
   const base64 = Buffer.from(arrayBuffer).toString("base64");
   return `data:video/mp4;base64,${base64}`;
