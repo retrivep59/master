@@ -40,9 +40,20 @@ export default function MainApp() {
               <p className="text-gray-500 text-xs mt-0.5">NSFW Image to Video Generator</p>
             </div>
           </div>
-          <div className="flex items-center gap-1.5 bg-green-500/10 text-green-400 text-xs font-medium px-3 py-1.5 rounded-full border border-green-500/20">
-            <Shield className="w-3.5 h-3.5" />
-            Age Verified
+          <div className="flex items-center gap-3">
+            <a
+              href="/scene-weaver"
+              className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-full border border-pink-500/30 bg-pink-500/10 text-pink-400 hover:bg-pink-500/20 transition-colors"
+            >
+              🎬 Story Mode
+              <span className="bg-pink-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full uppercase tracking-wide">
+                NEW
+              </span>
+            </a>
+            <div className="flex items-center gap-1.5 bg-green-500/10 text-green-400 text-xs font-medium px-3 py-1.5 rounded-full border border-green-500/20">
+              <Shield className="w-3.5 h-3.5" />
+              Age Verified
+            </div>
           </div>
         </div>
       </header>
