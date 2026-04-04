@@ -114,41 +114,42 @@ export default function SceneWeaverApp() {
     dispatch({ type: "SET_FINAL_VIDEO", url });
 
   return (
-    <div className="min-h-screen bg-[#030712] text-white">
+    <div className="min-h-screen bg-[#030712] text-white pb-20 md:pb-0">
       {/* Header */}
-      <header className="border-b border-gray-800 bg-gray-900/80 backdrop-blur-sm sticky top-0 z-10">
-        <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
-          <div>
-            <h1 className="font-bold text-lg leading-none">SceneWeaver</h1>
-            <p className="text-gray-500 text-xs mt-0.5">AI Story Video Creator</p>
+      <header className="border-b border-gray-800 bg-gray-900/90 backdrop-blur-sm sticky top-0 z-20">
+        <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <a href="/" className="text-gray-500 hover:text-gray-300 transition-colors p-1">
+              ←
+            </a>
+            <div>
+              <h1 className="font-bold text-base leading-none">SceneWeaver</h1>
+              <p className="text-gray-500 text-[10px] mt-0.5 hidden sm:block">AI Story Video Creator</p>
+            </div>
           </div>
           {/* Mode Toggle */}
           <div className="flex items-center bg-gray-900 border border-gray-700 rounded-xl p-1 gap-1">
             <button
               onClick={() => setMode("single")}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                mode === "single"
-                  ? "bg-pink-600 text-white shadow"
-                  : "text-gray-400 hover:text-gray-200"
+              className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                mode === "single" ? "bg-pink-600 text-white shadow" : "text-gray-400"
               }`}
             >
               📸 1 Photo
             </button>
             <button
               onClick={() => setMode("multi")}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                mode === "multi"
-                  ? "bg-purple-600 text-white shadow"
-                  : "text-gray-400 hover:text-gray-200"
+              className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                mode === "multi" ? "bg-purple-600 text-white shadow" : "text-gray-400"
               }`}
             >
-              🎞️ Multi-Scene
+              🎞️ Multi
             </button>
           </div>
         </div>
       </header>
 
-      <main className="max-w-4xl mx-auto px-4 py-8">
+      <main className="max-w-4xl mx-auto px-4 py-5 md:py-8">
         {/* Mode description */}
         <div className="mb-6">
           {mode === "single" ? (
@@ -246,6 +247,23 @@ export default function SceneWeaverApp() {
           onClose={() => handleSelectScene(null)}
         />
       )}
+
+      {/* Mobile Bottom Nav */}
+      <nav
+        className="md:hidden fixed bottom-0 inset-x-0 z-20 bg-gray-900/95 backdrop-blur-sm border-t border-gray-800"
+        style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+      >
+        <div className="flex">
+          <a href="/" className="flex-1 flex flex-col items-center justify-center py-2.5 gap-0.5 text-gray-500">
+            <span className="text-lg leading-none">🎬</span>
+            <span className="text-[10px] font-medium">Generator</span>
+          </a>
+          <div className="flex-1 flex flex-col items-center justify-center py-2.5 gap-0.5 text-pink-400 border-t-2 border-pink-500">
+            <span className="text-lg leading-none">🎞️</span>
+            <span className="text-[10px] font-medium">Story Mode</span>
+          </div>
+        </div>
+      </nav>
     </div>
   );
 }

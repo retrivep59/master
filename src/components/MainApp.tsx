@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import AgeVerification from "./AgeVerification";
 import GeneratorForm from "./GeneratorForm";
-import { Film, Shield } from "lucide-react";
+import { Film, Shield, Clapperboard } from "lucide-react";
 
 export default function MainApp() {
   const [verified, setVerified] = useState(false);
@@ -21,95 +21,91 @@ export default function MainApp() {
   };
 
   if (!mounted) return null;
-
-  if (!verified) {
-    return <AgeVerification onVerify={handleVerify} />;
-  }
+  if (!verified) return <AgeVerification onVerify={handleVerify} />;
 
   return (
-    <div className="min-h-screen bg-gray-950 text-white">
+    <div className="min-h-screen bg-gray-950 text-white pb-20 md:pb-0">
       {/* Header */}
-      <header className="border-b border-gray-800 bg-gray-900/80 backdrop-blur-sm sticky top-0 z-10">
-        <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="bg-gradient-to-br from-purple-600 to-pink-600 p-2 rounded-xl">
-              <Film className="w-5 h-5 text-white" />
+      <header className="border-b border-gray-800 bg-gray-900/90 backdrop-blur-sm sticky top-0 z-20">
+        <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <div className="bg-gradient-to-br from-purple-600 to-pink-600 p-1.5 rounded-lg">
+              <Film className="w-4 h-4 text-white" />
             </div>
             <div>
-              <h1 className="font-bold text-lg leading-none">ImageMotion AI</h1>
-              <p className="text-gray-500 text-xs mt-0.5">NSFW Image to Video Generator</p>
+              <h1 className="font-bold text-base leading-none">ImageMotion AI</h1>
+              <p className="text-gray-500 text-[10px] mt-0.5 hidden sm:block">NSFW Image to Video</p>
             </div>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
             <a
               href="/scene-weaver"
-              className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-full border border-pink-500/30 bg-pink-500/10 text-pink-400 hover:bg-pink-500/20 transition-colors"
+              className="hidden sm:flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-full border border-pink-500/30 bg-pink-500/10 text-pink-400 hover:bg-pink-500/20 transition-colors"
             >
               🎬 Story Mode
-              <span className="bg-pink-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full uppercase tracking-wide">
-                NEW
-              </span>
+              <span className="bg-pink-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full uppercase">NEW</span>
             </a>
-            <div className="flex items-center gap-1.5 bg-green-500/10 text-green-400 text-xs font-medium px-3 py-1.5 rounded-full border border-green-500/20">
-              <Shield className="w-3.5 h-3.5" />
-              Age Verified
+            <div className="flex items-center gap-1 bg-green-500/10 text-green-400 text-[10px] font-medium px-2.5 py-1.5 rounded-full border border-green-500/20">
+              <Shield className="w-3 h-3" />
+              <span className="hidden sm:inline">Age Verified</span>
             </div>
           </div>
         </div>
       </header>
 
-      {/* Main Content */}
-      <main className="max-w-6xl mx-auto px-4 py-8">
-        <div className="mb-8">
-          <h2 className="text-2xl font-bold mb-2">
+      {/* Main */}
+      <main className="max-w-6xl mx-auto px-4 py-5 md:py-8">
+        <div className="mb-5">
+          <h2 className="text-xl md:text-2xl font-bold mb-1.5">
             Transform Images into{" "}
             <span className="bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
               Videos
             </span>
           </h2>
-          <p className="text-gray-400">
-            Upload any image and use AI to animate it into a fluid video clip. Powered by Stable Video Diffusion.
-          </p>
+          <p className="text-gray-400 text-sm">Upload a photo — AI animates it into a fluid video clip.</p>
         </div>
 
         <GeneratorForm />
 
-        {/* Features */}
-        <div className="mt-12 grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="mt-8 grid grid-cols-1 sm:grid-cols-3 gap-3">
           {[
-            {
-              title: "Stable Video Diffusion",
-              desc: "Powered by stability.ai's SVD model for high-quality motion synthesis",
-              icon: "🎬",
-            },
-            {
-              title: "Full Control",
-              desc: "Adjust motion intensity, FPS, frame count, and noise augmentation",
-              icon: "🎛️",
-            },
-            {
-              title: "Private & Secure",
-              desc: "Your images are processed securely and never stored long-term",
-              icon: "🔒",
-            },
+            { title: "Stable Video Diffusion", desc: "High-quality AI motion synthesis", icon: "🎬" },
+            { title: "50 Templates", desc: "9 adult categories, one tap to apply", icon: "🎛️" },
+            { title: "Private & Secure", desc: "Images never stored long-term", icon: "🔒" },
           ].map((f) => (
-            <div
-              key={f.title}
-              className="bg-gray-900 border border-gray-800 rounded-xl p-5"
-            >
-              <div className="text-2xl mb-3">{f.icon}</div>
-              <h3 className="font-semibold text-white mb-1">{f.title}</h3>
-              <p className="text-gray-500 text-sm">{f.desc}</p>
+            <div key={f.title} className="bg-gray-900 border border-gray-800 rounded-xl p-4 flex items-start gap-3 sm:flex-col sm:gap-0">
+              <div className="text-2xl sm:mb-2 flex-shrink-0">{f.icon}</div>
+              <div>
+                <h3 className="font-semibold text-white text-sm mb-0.5">{f.title}</h3>
+                <p className="text-gray-500 text-xs">{f.desc}</p>
+              </div>
             </div>
           ))}
         </div>
 
-        <div className="mt-8 bg-yellow-500/5 border border-yellow-500/20 rounded-xl p-4">
-          <p className="text-yellow-400/80 text-xs leading-relaxed">
-            <strong className="text-yellow-400">Disclaimer:</strong> This tool generates AI content from user-provided images. Users are solely responsible for the images they upload and the content they generate. All generated content must comply with applicable laws. This platform prohibits content depicting minors, non-consensual scenarios, or any illegal material. Misuse will result in immediate access termination.
+        <div className="mt-4 bg-yellow-500/5 border border-yellow-500/20 rounded-xl p-3">
+          <p className="text-yellow-400/70 text-[11px] leading-relaxed">
+            <strong className="text-yellow-400">18+ Only:</strong> All content must comply with applicable laws. No minors or non-consensual content.
           </p>
         </div>
       </main>
+
+      {/* Mobile Bottom Nav */}
+      <nav
+        className="md:hidden fixed bottom-0 inset-x-0 z-20 bg-gray-900/95 backdrop-blur-sm border-t border-gray-800"
+        style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+      >
+        <div className="flex">
+          <a href="/" className="flex-1 flex flex-col items-center justify-center py-2.5 gap-0.5 text-purple-400 border-t-2 border-purple-500">
+            <Film className="w-5 h-5" />
+            <span className="text-[10px] font-medium">Generator</span>
+          </a>
+          <a href="/scene-weaver" className="flex-1 flex flex-col items-center justify-center py-2.5 gap-0.5 text-gray-500">
+            <Clapperboard className="w-5 h-5" />
+            <span className="text-[10px] font-medium">Story Mode</span>
+          </a>
+        </div>
+      </nav>
     </div>
   );
 }

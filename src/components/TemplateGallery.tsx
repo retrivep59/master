@@ -81,14 +81,14 @@ export default function TemplateGallery({
       </div>
 
       {/* Template Grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 gap-2.5 max-h-[420px] overflow-y-auto pr-1">
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 gap-2 max-h-[400px] overflow-y-auto pr-0.5 scrollbar-none">
         {filtered.map((template) => {
           const isActive = activeTemplateId === template.id;
           return (
             <button
               key={template.id}
               onClick={() => handleSelect(template)}
-              className={`relative text-left p-3 rounded-xl border transition-all duration-150 group ${
+              className={`relative text-left p-3 rounded-xl border transition-all duration-150 active:scale-95 ${
                 isActive
                   ? "border-pink-500 bg-pink-500/10 shadow-lg shadow-pink-900/20"
                   : "border-gray-700 bg-gray-900 hover:border-pink-800/50 hover:bg-gray-800"

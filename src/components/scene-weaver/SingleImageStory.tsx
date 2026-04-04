@@ -392,7 +392,7 @@ export default function SingleImageStory({ mood }: SingleImageStoryProps) {
             </button>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+          <div className="grid grid-cols-2 lg:grid-cols-3 gap-2">
             {AUTO_TEMPLATES.map((tpl) => {
               const selected = selectedIds.has(tpl.id);
               return (
@@ -478,7 +478,7 @@ export default function SingleImageStory({ mood }: SingleImageStoryProps) {
               {doneCount}/{clips.length} complete
             </span>
           </p>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
             {clips.map((clip, i) => (
               <ClipCard key={clip.id} clip={clip} index={i} />
             ))}
@@ -506,7 +506,7 @@ export default function SingleImageStory({ mood }: SingleImageStoryProps) {
               className="w-full max-h-80 object-contain bg-gray-950"
             />
           </div>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             <a
               href={finalVideoUrl}
               download={`story-${mood}-${Date.now()}.mp4`}

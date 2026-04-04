@@ -53,13 +53,13 @@ const MOODS: Array<{
 
 export default function MoodSelector({ mood, onMoodChange }: MoodSelectorProps) {
   return (
-    <div className="flex flex-wrap gap-2" role="group" aria-label="Story mood">
+    <div className="grid grid-cols-3 sm:flex sm:flex-wrap gap-2" role="group" aria-label="Story mood">
       {MOODS.map((m) => (
         <button
           key={m.value}
           onClick={() => onMoodChange(m.value)}
           aria-pressed={mood === m.value}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border text-sm font-medium transition-all duration-150 ${
+          className={`flex items-center justify-center gap-1.5 px-3 py-3 sm:py-2.5 rounded-xl border text-sm font-medium transition-all duration-150 active:scale-95 ${
             mood === m.value
               ? m.activeClass
               : "bg-gray-900 border-gray-700 text-gray-400 hover:border-gray-600 hover:text-gray-200"
