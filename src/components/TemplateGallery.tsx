@@ -3,6 +3,19 @@
 import { useState } from "react";
 import { Flame, Check } from "lucide-react";
 import { TEMPLATES, TEMPLATE_CATEGORIES, Template } from "@/data/templates";
+
+const CATEGORY_EMOJIS: Record<string, string> = {
+  All: "🔥",
+  Striptease: "👗",
+  Lingerie: "🎀",
+  Shower: "🚿",
+  Bedroom: "🛏️",
+  Domination: "⛓️",
+  Roleplay: "🎭",
+  "Solo Play": "💃",
+  Couples: "💏",
+  Fetish: "✨",
+};
 import type { VideoSettingsValues } from "./VideoSettings";
 
 interface TemplateGalleryProps {
@@ -38,7 +51,7 @@ export default function TemplateGallery({
           </p>
         </div>
         {activeTemplateId && (
-          <span className="text-xs text-purple-400 bg-purple-500/10 border border-purple-500/20 px-2.5 py-1 rounded-full">
+          <span className="text-xs text-pink-400 bg-pink-500/10 border border-pink-500/20 px-2.5 py-1 rounded-full">
             Template active
           </span>
         )}
@@ -50,15 +63,16 @@ export default function TemplateGallery({
           <button
             key={cat}
             onClick={() => setActiveCategory(cat)}
-            className={`flex-shrink-0 text-xs font-medium px-3 py-1.5 rounded-full border transition-colors ${
+            className={`flex-shrink-0 flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-full border transition-colors ${
               activeCategory === cat
-                ? "bg-purple-600 border-purple-600 text-white"
-                : "bg-gray-900 border-gray-700 text-gray-400 hover:border-gray-500 hover:text-gray-300"
+                ? "bg-pink-600 border-pink-600 text-white shadow-md shadow-pink-900/30"
+                : "bg-gray-900 border-gray-700 text-gray-400 hover:border-pink-700/50 hover:text-gray-300"
             }`}
           >
+            <span>{CATEGORY_EMOJIS[cat]}</span>
             {cat}
             {cat !== "All" && (
-              <span className="ml-1.5 text-xs opacity-60">
+              <span className="text-[10px] opacity-60">
                 {TEMPLATES.filter((t) => t.category === cat).length}
               </span>
             )}
@@ -76,8 +90,8 @@ export default function TemplateGallery({
               onClick={() => handleSelect(template)}
               className={`relative text-left p-3 rounded-xl border transition-all duration-150 group ${
                 isActive
-                  ? "border-purple-500 bg-purple-500/10 shadow-lg shadow-purple-900/20"
-                  : "border-gray-700 bg-gray-900 hover:border-gray-500 hover:bg-gray-800"
+                  ? "border-pink-500 bg-pink-500/10 shadow-lg shadow-pink-900/20"
+                  : "border-gray-700 bg-gray-900 hover:border-pink-800/50 hover:bg-gray-800"
               }`}
             >
               {/* Hot badge */}
@@ -90,7 +104,7 @@ export default function TemplateGallery({
 
               {/* Active check */}
               {isActive && (
-                <span className="absolute top-2 right-2 bg-purple-500 rounded-full p-0.5">
+                <span className="absolute top-2 right-2 bg-pink-500 rounded-full p-0.5">
                   <Check className="w-2.5 h-2.5 text-white" />
                 </span>
               )}
