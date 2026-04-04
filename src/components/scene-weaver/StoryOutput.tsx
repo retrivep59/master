@@ -9,14 +9,14 @@ interface StoryOutputProps {
 
 export default function StoryOutput({ videoUrl, sceneCount }: StoryOutputProps) {
   return (
-    <div className="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden">
+    <div className="rounded-2xl overflow-hidden" style={{ background: "#0d000d", border: "1px solid rgba(192,0,106,0.3)" }}>
       {/* Header */}
-      <div className="px-5 py-4 border-b border-gray-800 flex items-center justify-between">
+      <div className="px-5 py-4 flex items-center justify-between" style={{ borderBottom: "1px solid rgba(192,0,106,0.2)" }}>
         <div className="flex items-center gap-2.5">
-          <Film className="w-5 h-5 text-pink-400" aria-hidden="true" />
+          <Film className="w-5 h-5" style={{ color: "#c0006a" }} />
           <div>
-            <h3 className="font-semibold text-white text-sm">Your Story</h3>
-            <p className="text-gray-500 text-xs">
+            <h3 className="font-black text-sm" style={{ color: "#ff69b4" }}>Your Story 🔞</h3>
+            <p className="text-xs" style={{ color: "#7a4a7a" }}>
               {sceneCount} scene{sceneCount !== 1 ? "s" : ""} combined
             </p>
           </div>
@@ -26,15 +26,16 @@ export default function StoryOutput({ videoUrl, sceneCount }: StoryOutputProps) 
           href={videoUrl}
           download="sceneweaver-story.mp4"
           aria-label="Download story video"
-          className="flex items-center gap-2 bg-pink-600 hover:bg-pink-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
+          className="flex items-center gap-2 text-white text-sm font-bold px-4 py-2 rounded-lg transition-all active:scale-95"
+          style={{ background: "linear-gradient(135deg,#c0006a,#7a00c0)", boxShadow: "0 0 16px rgba(192,0,106,0.4)" }}
         >
-          <Download className="w-4 h-4" aria-hidden="true" />
+          <Download className="w-4 h-4" />
           Download
         </a>
       </div>
 
-      {/* Video player */}
-      <div className="bg-black">
+      {/* Video */}
+      <div style={{ background: "#000" }}>
         <video
           src={videoUrl}
           controls

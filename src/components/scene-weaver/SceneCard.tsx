@@ -4,11 +4,11 @@ import type { DragEvent } from "react";
 import { Edit2 } from "lucide-react";
 import type { Scene } from "@/types/scene-weaver";
 
-const STATUS_BADGE: Record<Scene["status"], { label: string; className: string }> = {
-  idle: { label: "Ready", className: "bg-gray-700 text-gray-300" },
-  generating: { label: "Generating…", className: "bg-yellow-500/20 text-yellow-300" },
-  done: { label: "Done", className: "bg-green-500/20 text-green-400" },
-  error: { label: "Error", className: "bg-red-500/20 text-red-400" },
+const STATUS_BADGE: Record<Scene["status"], { label: string; style: React.CSSProperties }> = {
+  idle:       { label: "Ready",       style: { background: "rgba(255,255,255,0.06)", color: "#7a4a7a" } },
+  generating: { label: "Animating…", style: { background: "rgba(192,0,106,0.2)",   color: "#ff69b4" } },
+  done:       { label: "Done ✓",     style: { background: "rgba(0,180,80,0.15)",    color: "#4ade80" } },
+  error:      { label: "Error",       style: { background: "rgba(180,0,0,0.2)",      color: "#f87171" } },
 };
 
 interface SceneCardProps {
@@ -17,18 +17,12 @@ interface SceneCardProps {
   isSelected: boolean;
   onClick: () => void;
   onDragStart: (e: DragEvent<HTMLDivElement>) => void;
-  onDragOver: (e: DragEvent<HTMLDivElement>) => void;
-  onDrop: (e: DragEvent<HTMLDivElement>) => void;
+  onDragOver:  (e: DragEvent<HTMLDivElement>) => void;
+  onDrop:      (e: DragEvent<HTMLDivElement>) => void;
 }
 
 export default function SceneCard({
-  scene,
-  index,
-  isSelected,
-  onClick,
-  onDragStart,
-  onDragOver,
-  onDrop,
+  scene, index, isSelected, onClick, onDragStart, onDragOver, onDrop,
 }: SceneCardProps) {
   const badge = STATUS_BADGE[scene.status];
 
@@ -38,71 +32,55 @@ export default function SceneCard({
       onDragStart={onDragStart}
       onDragOver={onDragOver}
       onDrop={onDrop}
-      className={`w-36 rounded-xl overflow-hidden border cursor-pointer transition-all duration-150 select-none ${
-        isSelected
-          ? "border-purple-500 ring-2 ring-purple-500/40"
-          : "border-gray-800 hover:border-gray-600"
-      }`}
+      className="w-36 rounded-xl overflow-hidden cursor-pointer transition-all duration-150 select-none"
+      style={{
+        border: isSelected
+          ? "1px solid #c0006a"
+          : "1px solid rgba(192,0,106,0.15)",
+        boxShadow: isSelected ? "0 0 16px rgba(192,0,106,0.35)" : "none",
+      }}
       role="button"
       aria-label={`Scene ${index + 1}${scene.caption ? `: ${scene.caption}` : ""}`}
       aria-pressed={isSelected}
       tabIndex={0}
       onClick={onClick}
-      onKeyDown={(e) => {
-        if (e.key === "Enter" || e.key === " ") {
-          e.preventDefault();
-          onClick();
-        }
-      }}
+      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onClick(); } }}
     >
       {/* Thumbnail */}
-      <div className="relative bg-gray-900 aspect-[3/4]">
+      <div className="relative aspect-[3/4]" style={{ background: "#100010" }}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={scene.imageUrl}
-          alt={`Scene ${index + 1} thumbnail`}
-          className="w-full h-full object-cover"
-          loading="lazy"
-        />
+        <img src={scene.imageUrl} alt={`Scene ${index + 1}`} className="w-full h-full object-cover" loading="lazy" />
 
-        {/* Scene number */}
-        <div className="absolute top-1.5 left-1.5 w-5 h-5 rounded-full bg-black/70 flex items-center justify-center text-[10px] font-bold text-white">
+        <div className="absolute top-1.5 left-1.5 w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold text-white"
+          style={{ background: "rgba(192,0,106,0.8)" }}>
           {index + 1}
         </div>
 
-        {/* Edit icon overlay */}
-        <div className="absolute inset-0 bg-black/0 hover:bg-black/30 flex items-center justify-center opacity-0 hover:opacity-100 transition-all duration-150">
-          <div className="bg-white/20 backdrop-blur-sm rounded-full p-2">
-            <Edit2 className="w-4 h-4 text-white" aria-hidden="true" />
+        <div className="absolute inset-0 flex items-center justify-center opacity-0 hover:opacity-100 transition-all duration-150"
+          style={{ background: "rgba(0,0,0,0.4)" }}>
+          <div className="rounded-full p-2" style={{ background: "rgba(192,0,106,0.5)" }}>
+            <Edit2 className="w-4 h-4 text-white" />
           </div>
         </div>
 
-        {/* Generating spinner overlay */}
         {scene.status === "generating" && (
-          <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-            <div
-              className="w-8 h-8 border-2 border-white border-t-transparent rounded-full animate-spin"
-              aria-hidden="true"
-            />
+          <div className="absolute inset-0 flex items-center justify-center" style={{ background: "rgba(0,0,0,0.6)" }}>
+            <div className="w-8 h-8 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: "#c0006a", borderTopColor: "transparent" }} />
           </div>
         )}
       </div>
 
       {/* Footer */}
-      <div className="bg-gray-900 px-2 py-2 space-y-1">
-        <span
-          className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium ${badge.className}`}
-        >
+      <div className="px-2 py-2 space-y-1" style={{ background: "rgba(8,0,8,0.9)" }}>
+        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium" style={badge.style}>
           {badge.label}
         </span>
-
         {scene.caption ? (
-          <p className="text-xs text-gray-400 truncate leading-tight">{scene.caption}</p>
+          <p className="text-xs truncate leading-tight" style={{ color: "#9a6a8a" }}>{scene.caption}</p>
         ) : (
-          <p className="text-xs text-gray-600 leading-tight">No caption</p>
+          <p className="text-xs leading-tight" style={{ color: "#4a2a4a" }}>No caption</p>
         )}
-
-        <p className="text-[10px] text-gray-600">{scene.duration}s</p>
+        <p className="text-[10px]" style={{ color: "#4a2a4a" }}>{scene.duration}s</p>
       </div>
     </div>
   );

@@ -8,78 +8,41 @@ interface SceneProgressProps {
   status: StoryStatus;
 }
 
-const STATUS_ICON: Record<
-  Scene["status"],
-  { icon: React.ReactNode; lineClass: string }
-> = {
-  idle: {
-    icon: <Circle className="w-4 h-4 text-gray-600" aria-hidden="true" />,
-    lineClass: "bg-gray-700",
-  },
-  generating: {
-    icon: (
-      <Loader2
-        className="w-4 h-4 text-yellow-400 animate-spin"
-        aria-hidden="true"
-      />
-    ),
-    lineClass: "bg-yellow-500/40",
-  },
-  done: {
-    icon: <CheckCircle className="w-4 h-4 text-green-400" aria-hidden="true" />,
-    lineClass: "bg-green-500/40",
-  },
-  error: {
-    icon: <AlertCircle className="w-4 h-4 text-red-400" aria-hidden="true" />,
-    lineClass: "bg-red-500/40",
-  },
-};
-
 export default function SceneProgress({ scenes, status }: SceneProgressProps) {
   return (
     <div
-      className="bg-gray-900/60 border border-gray-800 rounded-xl px-5 py-4"
+      className="rounded-xl px-5 py-4"
+      style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(192,0,106,0.2)" }}
       role="status"
       aria-label="Scene generation progress"
       aria-live="polite"
     >
-      <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-4">
-        {status === "stitching" ? "Stitching final video…" : "Generating scenes"}
+      <p className="text-xs font-bold uppercase tracking-wider mb-4" style={{ color: "#c0006a" }}>
+        {status === "stitching" ? "🎬 Stitching final video…" : "⚡ Generating scenes"}
       </p>
 
       <ol className="space-y-3">
-        {scenes.map((scene, index) => {
-          const { icon, lineClass } = STATUS_ICON[scene.status];
-          return (
-            <li key={scene.id} className="flex items-center gap-3">
-              {/* Connector line */}
-              {index < scenes.length - 1 && (
-                <span
-                  className={`absolute ml-[7px] mt-5 w-0.5 h-4 ${lineClass}`}
-                  aria-hidden="true"
-                />
+        {scenes.map((scene, index) => (
+          <li key={scene.id} className="flex items-center gap-3">
+            <span className="flex-shrink-0 relative z-10">
+              {scene.status === "idle"       && <Circle      className="w-4 h-4" style={{ color: "#4a2a4a" }} />}
+              {scene.status === "generating" && <Loader2     className="w-4 h-4 animate-spin" style={{ color: "#c0006a" }} />}
+              {scene.status === "done"       && <CheckCircle className="w-4 h-4" style={{ color: "#4ade80" }} />}
+              {scene.status === "error"      && <AlertCircle className="w-4 h-4" style={{ color: "#f87171" }} />}
+            </span>
+
+            <span className="text-sm" style={{ color: scene.status === "generating" ? "#ff69b4" : "#9a6a8a" }}>
+              Scene {index + 1}
+              {scene.caption && (
+                <span className="text-xs ml-1.5 truncate" style={{ color: "#4a2a4a" }}>— {scene.caption}</span>
               )}
+            </span>
 
-              {/* Icon */}
-              <span className="flex-shrink-0 relative z-10">{icon}</span>
-
-              {/* Label */}
-              <span className="text-sm text-gray-300">
-                Scene {index + 1}
-                {scene.caption && (
-                  <span className="text-gray-500 text-xs ml-1.5 truncate">
-                    — {scene.caption}
-                  </span>
-                )}
-              </span>
-
-              {/* Status label */}
-              <span className="ml-auto text-xs text-gray-500 capitalize">
-                {scene.status === "generating" ? "Animating…" : scene.status}
-              </span>
-            </li>
-          );
-        })}
+            <span className="ml-auto text-xs capitalize" style={{ color: "#7a4a7a" }}>
+              {scene.status === "generating" ? "Animating…" : scene.status}
+            </span>
+          </li>
+        ))}
       </ol>
     </div>
   );

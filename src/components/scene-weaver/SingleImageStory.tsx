@@ -49,29 +49,29 @@ const MOOD_CONFIG: Record<StoryMood, MoodConfig> = {
 
 function ClipCard({ clip, index }: { clip: Clip; index: number }) {
   return (
-    <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
+    <div className="rounded-xl overflow-hidden" style={{ background: "#0d000d", border: "1px solid rgba(192,0,106,0.2)" }}>
       {/* Clip number + label */}
-      <div className="flex items-center gap-2 px-3 py-2 border-b border-gray-800">
+      <div className="flex items-center gap-2 px-3 py-2" style={{ borderBottom: "1px solid rgba(192,0,106,0.15)" }}>
         <span className="text-lg leading-none">{clip.emoji}</span>
         <div className="flex-1 min-w-0">
-          <p className="text-white text-xs font-semibold truncate">
+          <p className="text-xs font-bold truncate" style={{ color: "#ff69b4" }}>
             Scene {index + 1} · {clip.label}
           </p>
-          <p className="text-gray-500 text-[11px] truncate">{clip.description}</p>
+          <p className="text-[11px] truncate" style={{ color: "#7a4a7a" }}>{clip.description}</p>
         </div>
         {clip.status === "generating" && (
-          <Loader2 className="w-4 h-4 text-purple-400 animate-spin flex-shrink-0" />
+          <Loader2 className="w-4 h-4 animate-spin flex-shrink-0" style={{ color: "#c0006a" }} />
         )}
         {clip.status === "done" && (
-          <CheckCircle className="w-4 h-4 text-green-400 flex-shrink-0" />
+          <CheckCircle className="w-4 h-4 flex-shrink-0" style={{ color: "#4ade80" }} />
         )}
         {clip.status === "error" && (
-          <XCircle className="w-4 h-4 text-red-400 flex-shrink-0" />
+          <XCircle className="w-4 h-4 flex-shrink-0" style={{ color: "#f87171" }} />
         )}
       </div>
 
       {/* Video or placeholder */}
-      <div className="aspect-video bg-gray-950 flex items-center justify-center">
+      <div className="aspect-video flex items-center justify-center" style={{ background: "#000" }}>
         {clip.status === "done" && clip.videoUrl ? (
           <video
             src={clip.videoUrl}
@@ -83,16 +83,16 @@ function ClipCard({ clip, index }: { clip: Clip; index: number }) {
           />
         ) : clip.status === "generating" ? (
           <div className="flex flex-col items-center gap-2">
-            <div className="w-8 h-8 border-2 border-purple-500 border-t-transparent rounded-full animate-spin" />
-            <p className="text-gray-600 text-[11px]">Animating…</p>
+            <div className="w-8 h-8 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: "#c0006a", borderTopColor: "transparent" }} />
+            <p className="text-[11px]" style={{ color: "#7a4a7a" }}>Animating…</p>
           </div>
         ) : clip.status === "error" ? (
           <div className="text-center px-3">
-            <XCircle className="w-6 h-6 text-red-500 mx-auto mb-1" />
-            <p className="text-red-400 text-[11px]">{clip.error ?? "Failed"}</p>
+            <XCircle className="w-6 h-6 mx-auto mb-1" style={{ color: "#f87171" }} />
+            <p className="text-[11px]" style={{ color: "#f87171" }}>{clip.error ?? "Failed"}</p>
           </div>
         ) : (
-          <div className="text-gray-700 text-[11px]">Queued</div>
+          <div className="text-[11px]" style={{ color: "#4a2a4a" }}>Queued</div>
         )}
       </div>
     </div>
@@ -307,26 +307,26 @@ export default function SingleImageStory({ mood }: SingleImageStoryProps) {
             onDragLeave={() => setDragging(false)}
             onDrop={handleDrop}
             onClick={() => fileInputRef.current?.click()}
-            className={`border-2 border-dashed rounded-xl p-10 text-center cursor-pointer transition-colors ${
-              dragging
-                ? "border-pink-500 bg-pink-500/10"
-                : "border-gray-700 hover:border-gray-500 bg-gray-900/50"
-            }`}
+            className="border-2 border-dashed rounded-xl p-10 text-center cursor-pointer transition-colors"
+            style={{
+              borderColor: dragging ? "#c0006a" : "rgba(192,0,106,0.25)",
+              background: dragging ? "rgba(192,0,106,0.08)" : "rgba(0,0,0,0.3)",
+            }}
           >
             <div className="flex flex-col items-center gap-3">
               {uploading ? (
-                <Loader2 className="w-8 h-8 text-gray-400 animate-spin" />
+                <Loader2 className="w-8 h-8 animate-spin" style={{ color: "#c0006a" }} />
               ) : (
-                <div className="bg-gray-800 p-4 rounded-full">
-                  <Upload className="w-6 h-6 text-gray-400" />
+                <div className="p-4 rounded-full" style={{ background: "rgba(192,0,106,0.15)" }}>
+                  <Upload className="w-6 h-6" style={{ color: "#c0006a" }} />
                 </div>
               )}
               <div>
-                <p className="text-gray-300 font-medium">
+                <p className="font-bold" style={{ color: "#e0b0c8" }}>
                   {uploading ? "Uploading…" : "Drop your photo here"}
                 </p>
-                <p className="text-gray-500 text-sm mt-1">
-                  One image → AI generates {AUTO_TEMPLATES.length} unique scenes
+                <p className="text-sm mt-1" style={{ color: "#7a4a7a" }}>
+                  One image → AI generates {AUTO_TEMPLATES.length} explicit scenes
                 </p>
               </div>
             </div>
@@ -346,11 +346,12 @@ export default function SingleImageStory({ mood }: SingleImageStoryProps) {
       {!imageUrl && (
         <div className="flex gap-2">
           <div className="relative flex-1">
-            <ImageIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
+            <ImageIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: "#7a4a7a" }} />
             <input
               type="url"
               placeholder="Or paste an image URL…"
-              className="w-full bg-gray-900 border border-gray-700 rounded-xl py-2.5 pl-9 pr-3 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-pink-500 transition-colors"
+              className="w-full rounded-xl py-2.5 pl-9 pr-3 text-sm text-white focus:outline-none transition-colors"
+              style={{ background: "rgba(0,0,0,0.4)", border: "1px solid rgba(192,0,106,0.25)" }}
               onKeyDown={(e) => {
                 if (e.key === "Enter") {
                   const v = (e.target as HTMLInputElement).value.trim();
@@ -365,7 +366,8 @@ export default function SingleImageStory({ mood }: SingleImageStoryProps) {
               const v = input?.value?.trim();
               if (v) { setImageUrl(v); setClips([]); setFinalVideoUrl(null); setGenerationStatus("idle"); }
             }}
-            className="bg-gray-800 hover:bg-gray-700 text-white px-4 py-2.5 rounded-xl text-sm font-medium border border-gray-700 transition-colors"
+            className="text-white px-4 py-2.5 rounded-xl text-sm font-bold transition-colors"
+            style={{ background: "rgba(192,0,106,0.2)", border: "1px solid rgba(192,0,106,0.4)" }}
           >
             Use
           </button>
@@ -400,25 +402,24 @@ export default function SingleImageStory({ mood }: SingleImageStoryProps) {
                   key={tpl.id}
                   onClick={() => toggleTemplate(tpl.id)}
                   disabled={isGenerating}
-                  className={`text-left p-3 rounded-xl border transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed ${
-                    selected
-                      ? "border-pink-500 bg-pink-500/10"
-                      : "border-gray-700 bg-gray-900 hover:border-gray-600"
-                  }`}
+                  className="text-left p-3 rounded-xl border transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed"
+                  style={selected
+                    ? { border: "1px solid #c0006a", background: "rgba(192,0,106,0.12)" }
+                    : { border: "1px solid rgba(192,0,106,0.12)", background: "rgba(0,0,0,0.3)" }}
                 >
                   <div className="flex items-center gap-2 mb-1">
                     <span className="text-xl leading-none">{tpl.emoji}</span>
-                    <span className="text-white text-xs font-semibold">{tpl.label}</span>
+                    <span className="text-xs font-bold" style={{ color: selected ? "#ff69b4" : "#e0b0c8" }}>{tpl.label}</span>
                     {selected && (
-                      <CheckCircle className="w-3.5 h-3.5 text-pink-400 ml-auto flex-shrink-0" />
+                      <CheckCircle className="w-3.5 h-3.5 ml-auto flex-shrink-0" style={{ color: "#c0006a" }} />
                     )}
                   </div>
-                  <p className="text-gray-500 text-[11px] leading-tight">{tpl.description}</p>
+                  <p className="text-[11px] leading-tight" style={{ color: "#7a4a7a" }}>{tpl.description}</p>
                   <div className="mt-1.5 flex gap-1">
-                    <span className="bg-gray-800 text-gray-400 text-[10px] px-1.5 py-0.5 rounded">
+                    <span className="text-[10px] px-1.5 py-0.5 rounded" style={{ background: "rgba(192,0,106,0.1)", color: "#c0006a" }}>
                       M:{tpl.motionBucketId}
                     </span>
-                    <span className="bg-gray-800 text-gray-400 text-[10px] px-1.5 py-0.5 rounded">
+                    <span className="text-[10px] px-1.5 py-0.5 rounded" style={{ background: "rgba(192,0,106,0.1)", color: "#c0006a" }}>
                       {tpl.fps}fps
                     </span>
                   </div>
@@ -427,10 +428,10 @@ export default function SingleImageStory({ mood }: SingleImageStoryProps) {
             })}
           </div>
 
-          <p className="text-gray-600 text-xs text-center">
+          <p className="text-xs text-center" style={{ color: "#4a2a4a" }}>
             {selectedTemplates.length} scene{selectedTemplates.length !== 1 ? "s" : ""} selected
             {selectedTemplates.length < 2 && (
-              <span className="text-red-400 ml-1">— select at least 2</span>
+              <span className="ml-1" style={{ color: "#f87171" }}>— select at least 2</span>
             )}
           </p>
         </div>
@@ -464,7 +465,7 @@ export default function SingleImageStory({ mood }: SingleImageStoryProps) {
 
       {/* ── Error ── */}
       {errorMsg && (
-        <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4 text-red-400 text-sm">
+        <div className="rounded-xl p-4 text-sm" style={{ background: "rgba(180,0,0,0.12)", border: "1px solid rgba(248,113,113,0.3)", color: "#f87171" }}>
           {errorMsg}
         </div>
       )}
@@ -472,9 +473,9 @@ export default function SingleImageStory({ mood }: SingleImageStoryProps) {
       {/* ── Clip Grid (live progress) ── */}
       {clips.length > 0 && (
         <div className="space-y-3">
-          <p className="text-sm font-medium text-gray-300">
+          <p className="text-sm font-bold" style={{ color: "#ff69b4" }}>
             Generated Scenes
-            <span className="ml-2 text-gray-500 font-normal text-xs">
+            <span className="ml-2 font-normal text-xs" style={{ color: "#7a4a7a" }}>
               {doneCount}/{clips.length} complete
             </span>
           </p>
@@ -490,20 +491,21 @@ export default function SingleImageStory({ mood }: SingleImageStoryProps) {
       {generationStatus === "done" && finalVideoUrl && (
         <div className="space-y-3">
           <div className="flex items-center justify-between">
-            <p className="text-sm font-semibold text-white">
-              ✅ Your {moodCfg.label} Story
+            <p className="text-sm font-black" style={{ color: "#ff69b4" }}>
+              🔥 Your {moodCfg.label} Story
             </p>
-            <span className="text-xs text-gray-500">
+            <span className="text-xs" style={{ color: "#7a4a7a" }}>
               {doneCount} scenes from 1 photo
             </span>
           </div>
-          <div className="rounded-xl overflow-hidden border border-gray-700">
+          <div className="rounded-xl overflow-hidden" style={{ border: "1px solid rgba(192,0,106,0.3)" }}>
             <video
               src={finalVideoUrl}
               controls
               autoPlay
               loop
-              className="w-full max-h-80 object-contain bg-gray-950"
+              className="w-full max-h-80 object-contain"
+              style={{ background: "#000" }}
             />
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -512,14 +514,16 @@ export default function SingleImageStory({ mood }: SingleImageStoryProps) {
               download={`story-${mood}-${Date.now()}.mp4`}
               target="_blank"
               rel="noreferrer"
-              className="flex items-center justify-center gap-2 bg-gray-800 hover:bg-gray-700 border border-gray-700 text-white text-sm font-medium py-2.5 rounded-xl transition-colors"
+              className="flex items-center justify-center gap-2 text-white text-sm font-bold py-2.5 rounded-xl transition-all active:scale-95"
+              style={{ background: "linear-gradient(135deg,#c0006a,#7a00c0)", boxShadow: "0 0 16px rgba(192,0,106,0.4)" }}
             >
               <Download className="w-4 h-4" />
               Download
             </a>
             <button
               onClick={handleGenerate}
-              className="flex items-center justify-center gap-2 bg-gray-900 hover:bg-gray-800 border border-gray-700 text-gray-300 text-sm font-medium py-2.5 rounded-xl transition-colors"
+              className="flex items-center justify-center gap-2 text-sm font-bold py-2.5 rounded-xl transition-colors"
+              style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(192,0,106,0.2)", color: "#9a6a8a" }}
             >
               <RefreshCw className="w-4 h-4" />
               Regenerate

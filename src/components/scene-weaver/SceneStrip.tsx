@@ -16,12 +16,7 @@ interface SceneStripProps {
 }
 
 export default function SceneStrip({
-  scenes,
-  onAddScene,
-  onRemoveScene,
-  onReorder,
-  onSelectScene,
-  selectedSceneId,
+  scenes, onAddScene, onRemoveScene, onReorder, onSelectScene, selectedSceneId,
 }: SceneStripProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dragIndexRef = useRef<number | null>(null);
@@ -30,14 +25,8 @@ export default function SceneStrip({
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (!file.type.startsWith("image/")) {
-      alert("Please select an image file.");
-      return;
-    }
-    if (file.size > 10 * 1024 * 1024) {
-      alert("Image must be under 10MB.");
-      return;
-    }
+    if (!file.type.startsWith("image/")) { alert("Please select an image file."); return; }
+    if (file.size > 10 * 1024 * 1024) { alert("Image must be under 10MB."); return; }
     setUploading(true);
     try {
       const formData = new FormData();
@@ -100,7 +89,8 @@ export default function SceneStrip({
             <button
               aria-label={`Remove scene ${index + 1}`}
               onClick={() => onRemoveScene(scene.id)}
-              className="absolute -top-2 -right-2 w-5 h-5 bg-red-600 hover:bg-red-500 text-white rounded-full text-xs items-center justify-center hidden group-hover/wrap:flex transition-colors z-10"
+              className="absolute -top-2 -right-2 w-5 h-5 text-white rounded-full text-xs items-center justify-center hidden group-hover/wrap:flex transition-colors z-10"
+              style={{ background: "#c0006a" }}
             >
               ×
             </button>
@@ -112,36 +102,29 @@ export default function SceneStrip({
             onClick={() => fileInputRef.current?.click()}
             disabled={uploading}
             aria-label="Add scene"
-            className="flex-shrink-0 w-36 min-h-[192px] flex flex-col items-center justify-center gap-2 border-2 border-dashed border-gray-700 hover:border-purple-500/60 hover:bg-purple-500/5 rounded-xl text-gray-500 hover:text-purple-400 transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex-shrink-0 w-36 min-h-[192px] flex flex-col items-center justify-center gap-2 border-2 border-dashed rounded-xl transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed"
+            style={{ borderColor: "rgba(192,0,106,0.25)", color: "#7a4a7a" }}
+            onMouseEnter={(e) => { e.currentTarget.style.borderColor = "rgba(192,0,106,0.6)"; e.currentTarget.style.color = "#c0006a"; }}
+            onMouseLeave={(e) => { e.currentTarget.style.borderColor = "rgba(192,0,106,0.25)"; e.currentTarget.style.color = "#7a4a7a"; }}
           >
             {uploading ? (
-              <div className="w-6 h-6 border-2 border-purple-500 border-t-transparent rounded-full animate-spin" />
+              <div className="w-6 h-6 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: "#c0006a", borderTopColor: "transparent" }} />
             ) : (
               <Plus className="w-6 h-6" />
             )}
-            <span className="text-xs font-medium">
-              {uploading ? "Uploading..." : "Add Scene"}
-            </span>
-            <span className="text-[10px] text-gray-600">
-              {scenes.length}/8
-            </span>
+            <span className="text-xs font-medium">{uploading ? "Uploading…" : "Add Scene"}</span>
+            <span className="text-[10px]" style={{ color: "#4a2a4a" }}>{scenes.length}/8</span>
           </button>
         )}
 
         {scenes.length === 0 && (
-          <div className="flex-1 flex items-center justify-center text-gray-600 text-sm py-8">
+          <div className="flex-1 flex items-center justify-center text-sm py-8" style={{ color: "#4a2a4a" }}>
             Add at least 2 scenes to create your story
           </div>
         )}
       </div>
 
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept="image/*"
-        className="hidden"
-        onChange={handleFileChange}
-      />
+      <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleFileChange} />
     </div>
   );
 }

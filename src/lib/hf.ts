@@ -1,16 +1,21 @@
 /**
- * HuggingFace Inference API — Stable Video Diffusion
+ * HuggingFace Inference API — Stable Video Diffusion + InstructPix2Pix
+ *
+ * Pipeline:
+ *   1. (optional) If user provides a prompt → instruct-pix2pix modifies the image
+ *   2. SVD animates the (possibly modified) image → raw MP4 → base64 data URL
  *
  * SVD requires raw binary image bytes (NOT JSON).
- * It returns a raw binary MP4 which we base64-encode for the browser.
- *
- * Correct endpoint: stabilityai/stable-video-diffusion-img2vid-xt-1-1
- * Docs: https://huggingface.co/stabilityai/stable-video-diffusion-img2vid-xt-1-1
+ * InstructPix2Pix accepts JSON with base64-encoded image.
  */
 
-// xt-1-1 is the latest, most stable version on HF free inference
-const HF_SVD_URL =
-  "https://api-inference.huggingface.co/models/stabilityai/stable-video-diffusion-img2vid-xt-1-1";
+const HF_BASE = "https://api-inference.huggingface.co/models";
+
+// xt-1-1 is the latest stable SVD on HF free inference
+const HF_SVD_URL = `${HF_BASE}/stabilityai/stable-video-diffusion-img2vid-xt-1-1`;
+
+// InstructPix2Pix — text-guided image editing before animation
+const HF_IP2P_URL = `${HF_BASE}/timbrooks/instruct-pix2pix`;
 
 export interface SVDParams {
   motionBucketId?: number;
@@ -34,6 +39,55 @@ async function toImageBuffer(imageUrl: string): Promise<Buffer> {
   const res = await fetch(imageUrl);
   if (!res.ok) throw new Error(`Failed to fetch image: ${res.status}`);
   return Buffer.from(await res.arrayBuffer());
+}
+
+/**
+ * Apply a text prompt to an image using InstructPix2Pix before animation.
+ * Returns the modified image as a data URL, or the original if the model fails.
+ */
+export async function applyPromptToImage(
+  imageUrl: string,
+  prompt: string
+): Promise<string> {
+  const token = process.env.HUGGINGFACE_API_TOKEN;
+  if (!token) throw new Error("HUGGINGFACE_API_TOKEN not set");
+
+  const imageBuffer = await toImageBuffer(imageUrl);
+  const base64Image = imageBuffer.toString("base64");
+
+  const response = await fetch(HF_IP2P_URL, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+      "X-Wait-For-Model": "true",
+      "X-Use-Cache": "false",
+    },
+    body: JSON.stringify({
+      inputs: prompt,
+      parameters: {
+        image: base64Image,
+        num_inference_steps: 20,
+        image_guidance_scale: 1.5,
+        guidance_scale: 7.5,
+      },
+    }),
+  });
+
+  if (!response.ok) {
+    // Fall back to original image — don't block video generation
+    console.warn(`InstructPix2Pix failed (${response.status}), using original image`);
+    return imageUrl;
+  }
+
+  // Response is raw image bytes (JPEG/PNG)
+  const imgBuffer = Buffer.from(await response.arrayBuffer());
+  if (imgBuffer.length < 500) {
+    console.warn("InstructPix2Pix returned empty image, using original");
+    return imageUrl;
+  }
+
+  return `data:image/jpeg;base64,${imgBuffer.toString("base64")}`;
 }
 
 /**

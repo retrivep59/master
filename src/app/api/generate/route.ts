@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { generateVideoHF } from "@/lib/hf";
+import { generateVideoHF, applyPromptToImage } from "@/lib/hf";
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { imageUrl, motionBucketId, fps, numFrames, condAug } = body;
+    const { imageUrl, motionBucketId, fps, numFrames, condAug, prompt } = body;
 
     if (!imageUrl) {
       return NextResponse.json(
@@ -13,7 +13,13 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const videoDataUrl = await generateVideoHF(imageUrl, {
+    // Step 1: If a prompt is provided, modify the image with InstructPix2Pix
+    const sourceImage = prompt?.trim()
+      ? await applyPromptToImage(imageUrl, prompt.trim())
+      : imageUrl;
+
+    // Step 2: Animate with SVD
+    const videoDataUrl = await generateVideoHF(sourceImage, {
       motionBucketId,
       fps,
       numFrames,

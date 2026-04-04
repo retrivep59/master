@@ -6,9 +6,9 @@ import type { Scene, StoryMood, StoryStatus } from "@/types/scene-weaver";
 import { TEMPLATES } from "@/data/templates";
 
 const DEFAULT_SETTINGS = {
-  motionBucketId: 100,
-  fps: 7,
-  numFrames: 14,
+  motionBucketId: 110,
+  fps: 8,
+  numFrames: 20,
   condAug: 0.03,
   decodeChunkSize: 14,
 };
@@ -49,7 +49,7 @@ export default function GenerateStoryButton({
     try {
       for (let i = 0; i < scenes.length; i++) {
         const scene = scenes[i];
-        setProgress(`Animating scene ${i + 1} of ${scenes.length}...`);
+        setProgress(`Animating scene ${i + 1} of ${scenes.length}…`);
         onSceneUpdate(scene.id, { status: "generating" });
 
         const settings = getSettings(scene);
@@ -67,17 +67,11 @@ export default function GenerateStoryButton({
         onSceneUpdate(scene.id, { status: "done", videoUrl: data.videoUrl });
       }
 
-      setProgress("Stitching your story...");
+      setProgress("Stitching your story…");
       onStatusChange("stitching");
 
-      const doneScenes = scenes.filter((s) => {
-        const updated = scenes.find((x) => x.id === s.id);
-        return updated?.videoUrl;
-      });
-
-      if (doneScenes.length < 2) {
-        throw new Error("Not enough scenes generated successfully");
-      }
+      const doneScenes = scenes.filter((s) => s.videoUrl);
+      if (doneScenes.length < 2) throw new Error("Not enough scenes generated");
 
       const stitchRes = await fetch("/api/scene-weaver/stitch", {
         method: "POST",
@@ -91,11 +85,8 @@ export default function GenerateStoryButton({
       });
       const stitchData = await stitchRes.json() as { clips?: Array<{ url: string }>; error?: string };
 
-      if (!stitchRes.ok || stitchData.error) {
-        throw new Error(stitchData.error ?? "Stitch failed");
-      }
+      if (!stitchRes.ok || stitchData.error) throw new Error(stitchData.error ?? "Stitch failed");
 
-      // Use first clip URL as the representative video (client-side stitching would combine them)
       const firstUrl = stitchData.clips?.[0]?.url ?? doneScenes[0]?.videoUrl ?? "";
       onFinalVideo(firstUrl);
       onStatusChange("done");
@@ -113,23 +104,29 @@ export default function GenerateStoryButton({
       <button
         onClick={handleGenerate}
         disabled={loading || !canGenerate}
-        className="w-full flex items-center justify-center gap-2.5 bg-gradient-to-r from-pink-600 to-purple-600 hover:from-pink-700 hover:to-purple-700 disabled:from-gray-700 disabled:to-gray-700 disabled:cursor-not-allowed text-white font-semibold py-4 px-6 rounded-xl transition-all duration-200 shadow-lg shadow-pink-900/30 text-base"
+        className="w-full flex items-center justify-center gap-2.5 text-white font-black py-4 px-6 rounded-xl transition-all active:scale-95 text-base disabled:opacity-40 disabled:cursor-not-allowed"
+        style={{
+          background: loading || !canGenerate
+            ? "rgba(255,255,255,0.06)"
+            : "linear-gradient(135deg, #c0006a, #7a00c0)",
+          boxShadow: loading || !canGenerate ? "none" : "0 0 30px rgba(192,0,106,0.4)",
+        }}
       >
         {loading ? (
           <>
-            <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-            {progress ?? "Generating..."}
+            <div className="w-5 h-5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+            {progress ?? "Generating…"}
           </>
         ) : (
           <>
             <Sparkles className="w-5 h-5" />
-            Generate Story Video
+            🔥 Generate Story Video
           </>
         )}
       </button>
 
       {!canGenerate && !loading && (
-        <p className="text-center text-gray-600 text-xs">
+        <p className="text-center text-xs" style={{ color: "#7a4a7a" }}>
           {scenes.length < 2
             ? `Add ${2 - scenes.length} more scene${scenes.length === 1 ? "" : "s"} to generate`
             : "All scenes need an image"}
