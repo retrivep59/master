@@ -1,0 +1,52 @@
+{
+  "expo": {
+    "name": "CalorieAI",
+    "slug": "calorie-tracker-ios",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "scheme": "calorieai",
+    "userInterfaceStyle": "light",
+    "icon": "./assets/icon.png",
+    "splash": {
+      "backgroundColor": "#FFFFFF"
+    },
+    "ios": {
+      "bundleIdentifier": "com.yourorg.calorieai",
+      "supportsTablet": false,
+      "infoPlist": {
+        "NSCameraUsageDescription": "CalorieAI uses the camera to identify food and estimate calories.",
+        "NSMicrophoneUsageDescription": "CalorieAI uses the microphone to log food by voice.",
+        "NSPhotoLibraryUsageDescription": "CalorieAI allows you to pick photos from your library.",
+        "NSPhotoLibraryAddUsageDescription": "CalorieAI saves food photos to your library."
+      }
+    },
+    "android": {
+      "package": "com.yourorg.calorieai",
+      "permissions": [
+        "CAMERA",
+        "RECORD_AUDIO",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE"
+      ]
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow CalorieAI to use the camera for AI food scanning."
+        }
+      ],
+      "expo-speech",
+      [
+        "expo-av",
+        {
+          "microphonePermission": "Allow CalorieAI to use the microphone for voice food logging."
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}
