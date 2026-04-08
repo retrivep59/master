@@ -169,7 +169,7 @@ def main() -> None:
     logger.info("Warming up agent on %d historical candles ...", len(hist_df))
     warmup_count = 0
     for candle in feed.iter_history(hist_df):
-        broker.update_market_price(symbol, instrument, candle["close"])
+        broker.update_market_price(symbol, instrument, candle["close"], candle_ts=candle["timestamp"])
         broker.process_pending_orders()
         signal = agent.on_candle(candle, broker)
 
@@ -177,6 +177,7 @@ def main() -> None:
             order = broker.place_order(
                 symbol=symbol, instrument=instrument,
                 action=signal.action, order_type="MARKET", lots=signal.lots,
+                timestamp=candle["timestamp"],
             )
             if order.status == "FILLED" and hasattr(agent, "sync_state_from_broker"):
                 agent.sync_state_from_broker(broker)
@@ -235,7 +236,7 @@ def main() -> None:
                 "volume":    0.0,
             }
 
-            broker.update_market_price(symbol, instrument, candle["close"])
+            broker.update_market_price(symbol, instrument, candle["close"], candle_ts=candle["timestamp"])
             broker.process_pending_orders()
             signal = agent.on_candle(candle, broker)
 
@@ -244,6 +245,7 @@ def main() -> None:
                 order = broker.place_order(
                     symbol=symbol, instrument=instrument,
                     action=signal.action, order_type="MARKET", lots=signal.lots,
+                    timestamp=candle["timestamp"],
                 )
                 if order.status == "FILLED" and hasattr(agent, "sync_state_from_broker"):
                     agent.sync_state_from_broker(broker)

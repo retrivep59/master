@@ -225,13 +225,23 @@ class PaperBroker:
     # Market price feed
     # ------------------------------------------------------------------
 
-    def update_market_price(self, symbol: str, instrument: str, price: float) -> None:
+    def update_market_price(
+        self,
+        symbol:    str,
+        instrument: str,
+        price:     float,
+        candle_ts=None,
+    ) -> None:
         """Called by the data feed / simulation engine every new candle."""
         self._market_prices[f"{symbol}_{instrument}"] = price
-        self._maybe_reset_day_counters()
+        self._maybe_reset_day_counters(candle_ts)
 
-    def _maybe_reset_day_counters(self) -> None:
-        today = date.today()
+    def _maybe_reset_day_counters(self, candle_ts=None) -> None:
+        # Use the candle's simulated date during backtests; fall back to wall clock
+        if candle_ts is not None:
+            today = candle_ts.date() if hasattr(candle_ts, "date") else date.today()
+        else:
+            today = date.today()
         if self._trading_date != today:
             self._trading_date       = today
             self._trades_today       = 0
@@ -249,6 +259,7 @@ class PaperBroker:
         order_type:  str   = "MARKET",
         lots:        int   = 1,
         limit_price: Optional[float] = None,
+        timestamp:   Optional[datetime] = None,
     ) -> Order:
         """
         Place a paper order.  For MARKET orders the order is filled
@@ -258,7 +269,7 @@ class PaperBroker:
         """
         order = Order(
             order_id    = str(uuid.uuid4())[:8].upper(),
-            timestamp   = datetime.now(),
+            timestamp   = timestamp if timestamp is not None else datetime.now(),
             symbol      = symbol,
             instrument  = instrument,
             action      = action,
@@ -398,7 +409,7 @@ class PaperBroker:
                     trade_id    = str(uuid.uuid4())[:8].upper(),
                     symbol      = symbol,
                     instrument  = pos.instrument,
-                    action      = order.action,
+                    action      = "BUY" if pos.lots > 0 else "SELL",  # entry direction
                     lots        = closing_lots,
                     entry_price = pos.avg_price,
                     exit_price  = fill_price,

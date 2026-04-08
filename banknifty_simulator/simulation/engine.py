@@ -123,7 +123,7 @@ class SimulationEngine:
 
         # FIX 17: use agent's instrument instead of hardcoding INSTRUMENT_FUTURES
         self.broker.update_market_price(
-            self.symbol, self.agent.instrument, close
+            self.symbol, self.agent.instrument, close, candle_ts=ts
         )
 
         # Fill any pending limit orders at this candle's price
