@@ -470,6 +470,19 @@ class PaperBroker:
         if self.balance < cfg.BROKERAGE_PER_ORDER * 2:
             return "Insufficient balance to cover minimum brokerage"
 
+        # Futures margin sufficiency check – reject before the order touches balance
+        if order.instrument == cfg.INSTRUMENT_FUTURES and order.action == "BUY":
+            latest_price = self._market_prices.get(
+                f"{order.symbol}_{order.instrument}", 0.0
+            )
+            if latest_price > 0:
+                required_margin = latest_price * order.lots * self.lot_size * 0.10
+                if self.balance < required_margin + cfg.BROKERAGE_PER_ORDER:
+                    return (
+                        f"Insufficient margin for futures: need ₹{required_margin:,.0f} "
+                        f"(10% SPAN), have ₹{self.balance:,.0f}"
+                    )
+
         return ""
 
     # ------------------------------------------------------------------
