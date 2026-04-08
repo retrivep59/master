@@ -198,10 +198,14 @@ class BankNiftyAgent:
     # ------------------------------------------------------------------
 
     def sync_state_from_broker(self, broker) -> None:
-        """FIX 7: Reset _in_long/_in_short based on actual broker open positions."""
+        """FIX 7: Reset _in_long/_in_short based on actual broker open positions.
+        Filters to THIS agent's symbol+instrument to avoid blocking entries when
+        other unrelated positions are open on different symbols."""
         positions = broker.get_open_positions()
-        self._in_long  = any(p["lots"] > 0 for p in positions)
-        self._in_short = any(p["lots"] < 0 for p in positions)
+        own = [p for p in positions
+               if p["symbol"] == self.symbol and p["instrument"] == self.instrument]
+        self._in_long  = any(p["lots"] > 0 for p in own)
+        self._in_short = any(p["lots"] < 0 for p in own)
 
     def on_candle(self, candle: dict, broker=None) -> Signal:
         """

@@ -388,7 +388,8 @@ class PaperBroker:
 
                 # FIX 4: proportional share of entry fees for this closing leg
                 proportional_entry_fees = pos.entry_fees * (closing_lots / lots_before_close)
-                net_pnl = gross_pnl - proportional_entry_fees  # exit fees already deducted above
+                # net_pnl deducts BOTH entry fees and exit fees so Trade record is accurate
+                net_pnl = gross_pnl - proportional_entry_fees - fees
 
                 self.balance          += gross_pnl
                 self._realised_pnl_today += net_pnl
