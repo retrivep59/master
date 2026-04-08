@@ -254,6 +254,10 @@ class SimulationEngine:
                     f"avg=₹{p['avg_price']:.2f}  cur=₹{p['current_price']:.2f}"
                 )
 
+        summary = self.broker.get_account_summary()
+        if "max_drawdown" in summary:
+            print(f"  Max Drawdown : ₹{summary['max_drawdown']:,.2f}  ({summary['max_drawdown_pct']:.2f}%)")
+
         # Win-rate calculation
         if trades:
             winners = sum(1 for t in trades if t["net_pnl"] > 0)

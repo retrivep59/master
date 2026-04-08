@@ -34,6 +34,7 @@ from typing import Deque, List, Optional
 
 from collections import deque
 
+import pandas as _pd
 import config as _config
 
 logger = logging.getLogger(__name__)
@@ -186,8 +187,8 @@ class BankNiftyAgent:
         self._in_long:  bool = False
         self._in_short: bool = False
 
-        # FIX 12: peak unrealised P&L for trailing stop tracking
-        self._peak_pnl: float = 0.0
+        # FIX 12: peak unrealised P&L for trailing stop tracking (keyed per position)
+        self._peak_pnl: dict = {}
 
         # Indicator snapshot of the last candle (for reporting)
         self.last_indicators: dict = {}
@@ -225,10 +226,13 @@ class BankNiftyAgent:
 
         # FIX 13: session filter – only trade within NSE market hours (09:15–15:30 IST)
         IST = pytz.timezone("Asia/Kolkata")
-        if hasattr(ts, 'tzinfo'):
-            ts_ist = ts.astimezone(IST) if ts.tzinfo else ts.replace(tzinfo=pytz.utc).astimezone(IST)
+        # FIX E: robust IST conversion for pandas Timestamps and plain datetimes
+        if isinstance(ts, _pd.Timestamp):
+            ts_ist = ts.tz_localize("UTC").tz_convert(IST) if ts.tzinfo is None else ts.tz_convert(IST)
+        elif hasattr(ts, 'astimezone'):
+            ts_ist = ts.astimezone(IST) if ts.tzinfo is not None else ts.replace(tzinfo=pytz.utc).astimezone(IST)
         else:
-            ts_ist = ts
+            ts_ist = datetime.now(IST)  # fallback: treat as current IST time
         t = ts_ist.time() if hasattr(ts_ist, 'time') else dtime(10, 0)
         if t < dtime(9, 15) or t >= dtime(15, 30):
             return Signal("HOLD", self.instrument, reason="outside market hours", timestamp=ts)
@@ -274,22 +278,32 @@ class BankNiftyAgent:
             if summary["realised_pnl_today"] < -daily_loss_limit:
                 return Signal("HOLD", self.instrument, reason="daily stop-loss hit", timestamp=ts)
 
-        # FIX 12: trailing stop-loss check
+        # FIX 12: trailing stop-loss check (per-position peak tracking)
         if broker:
             positions = broker.get_open_positions()
             for pos in positions:
-                cur = pos["current_price"]
-                avg = pos["avg_price"]
-                lots = pos["lots"]
+                cur   = float(pos["current_price"])
+                avg   = float(pos["avg_price"])
+                lots  = int(pos["lots"])
+                pkey  = f"{pos['symbol']}_{pos['instrument']}"
                 unrealised = (cur - avg) * abs(lots) * broker.lot_size * (1 if lots > 0 else -1)
-                if unrealised > self._peak_pnl:
-                    self._peak_pnl = unrealised
-                # If we've given back more than trailing_stop from peak, exit
-                if self._peak_pnl > 0 and (self._peak_pnl - unrealised) > self.cfg.trailing_stop_pts * abs(lots) * broker.lot_size:
-                    self._peak_pnl = 0.0
+
+                if unrealised > self._peak_pnl.get(pkey, 0.0):
+                    self._peak_pnl[pkey] = unrealised
+
+                # FIX D: instrument-aware threshold
+                if pos["instrument"] == _config.INSTRUMENT_FUTURES:
+                    threshold = self.cfg.trailing_stop_pts * abs(lots) * broker.lot_size
+                else:
+                    threshold = 10.0 * abs(lots) * broker.lot_size   # options: 10 premium pts
+
+                peak = self._peak_pnl.get(pkey, 0.0)
+                if peak > 0 and (peak - unrealised) > threshold:
+                    del self._peak_pnl[pkey]           # reset peak for this position
                     self._in_long  = False
                     self._in_short = False
-                    return Signal("SELL" if lots > 0 else "BUY", self.instrument,
+                    action = "SELL" if lots > 0 else "BUY"
+                    return Signal(action, pos["instrument"],
                                  lots=abs(lots), reason="Trailing stop triggered", timestamp=ts)
 
         return self._compute_signal(
@@ -427,7 +441,7 @@ class BankNiftyAgent:
         self._candle_count = 0
         self._in_long      = False
         self._in_short     = False
-        self._peak_pnl     = 0.0
+        self._peak_pnl     = {}
         self.last_indicators = {}
 
 

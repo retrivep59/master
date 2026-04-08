@@ -65,8 +65,8 @@ CLEARING_CHARGE_RATE = 0.000005  # 0.0005 %
 SLIPPAGE_MEAN_FUTURES = 1.5      # avg adverse slippage in index points
 SLIPPAGE_STD_FUTURES  = 1.0      # std-dev of slippage
 
-SLIPPAGE_MEAN_OPTIONS = 0.50     # avg adverse slippage on premium
-SLIPPAGE_STD_OPTIONS  = 0.75
+SLIPPAGE_MEAN_OPTIONS = 1.50     # increased from 0.50 to 1.50 premium points (realistic spread)
+SLIPPAGE_STD_OPTIONS  = 2.00     # increased from 0.75 to 2.00 (much wider spread)
 
 # ---------------------------------------------------------------------------
 # Risk Management Defaults (overridable per agent)

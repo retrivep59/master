@@ -294,12 +294,13 @@ class BankNiftyFeed:
             raise RuntimeError("No data loaded. Call fetch_historical() first.")
 
         for ts, row in source_df.iterrows():
-            # FIX 16: filter candles to NSE market hours
-            ts_ist = ts.astimezone(IST) if ts.tzinfo else ts
-            if hasattr(ts_ist, 'time'):
-                t = ts_ist.time()
-                if t < MARKET_OPEN or t >= MARKET_CLOSE:
-                    continue   # skip pre/post market candles
+            # FIX 16: filter candles to NSE market hours (skip for daily/weekly/monthly)
+            if self.interval not in ("1d", "daily", "1wk", "1mo"):
+                ts_ist = ts.astimezone(IST) if ts.tzinfo else ts
+                if hasattr(ts_ist, 'time'):
+                    t = ts_ist.time()
+                    if t < MARKET_OPEN or t >= MARKET_CLOSE:
+                        continue   # skip pre/post market candles
 
             candle = {
                 "timestamp": ts,

@@ -202,6 +202,11 @@ class PaperBroker:
         # FIX 6: Initialise total reserved margin tracking
         self._total_reserved_margin: float = 0.0
 
+        # Drawdown tracking
+        self._peak_balance: float     = starting_balance
+        self._max_drawdown: float     = 0.0          # maximum drawdown seen (positive number)
+        self._max_drawdown_pct: float = 0.0          # max drawdown as % of peak
+
         # FIX 3: positions keyed by f"{symbol}_{instrument}" to avoid collision
         self._positions:    Dict[str, Position] = {}
         self._orders:       List[Order]          = []
@@ -222,7 +227,7 @@ class PaperBroker:
 
     def update_market_price(self, symbol: str, instrument: str, price: float) -> None:
         """Called by the data feed / simulation engine every new candle."""
-        self._market_prices[symbol] = price
+        self._market_prices[f"{symbol}_{instrument}"] = price
         self._maybe_reset_day_counters()
 
     def _maybe_reset_day_counters(self) -> None:
@@ -287,7 +292,7 @@ class PaperBroker:
         for order in self._orders:
             if order.status != "PENDING":
                 continue
-            mp = self._market_prices.get(order.symbol)
+            mp = self._market_prices.get(f"{order.symbol}_{order.instrument}")
             if mp is None:
                 continue
 
@@ -308,7 +313,7 @@ class PaperBroker:
         quote = (
             order.limit_price
             if order.order_type == "LIMIT" and order.limit_price
-            else self._market_prices.get(order.symbol, 0.0)
+            else self._market_prices.get(f"{order.symbol}_{order.instrument}", 0.0)
         )
 
         fill_price = simulate_slippage(
@@ -430,6 +435,18 @@ class PaperBroker:
                     # FIX 5: track reserved margin
                     self._total_reserved_margin += additional_margin
 
+        self._update_drawdown()
+
+    def _update_drawdown(self) -> None:
+        """Track peak balance and maximum drawdown."""
+        current = self.balance + self._calc_unrealised_pnl()
+        if current > self._peak_balance:
+            self._peak_balance = current
+        drawdown = self._peak_balance - current
+        if drawdown > self._max_drawdown:
+            self._max_drawdown     = drawdown
+            self._max_drawdown_pct = drawdown / self._peak_balance * 100
+
     # ------------------------------------------------------------------
     # Risk management guards
     # ------------------------------------------------------------------
@@ -479,6 +496,9 @@ class PaperBroker:
             # FIX 5: expose reserved margin and available balance
             "reserved_margin":     round(self._total_reserved_margin,     2),
             "available_balance":   round(self.balance,                    2),
+            "peak_balance":        round(self._peak_balance,              2),
+            "max_drawdown":        round(self._max_drawdown,              2),
+            "max_drawdown_pct":    round(self._max_drawdown_pct,          3),
         }
 
     def get_open_positions(self) -> List[dict]:
@@ -489,7 +509,7 @@ class PaperBroker:
                 "lots":      p.lots,
                 "avg_price": p.avg_price,
                 "open_time": p.open_time.isoformat(),
-                "current_price": self._market_prices.get(p.symbol, p.avg_price),
+                "current_price": self._market_prices.get(f"{p.symbol}_{p.instrument}", p.avg_price),
             }
             for p in self._positions.values()
         ]
@@ -515,7 +535,8 @@ class PaperBroker:
     def _calc_unrealised_pnl(self) -> float:
         total = 0.0
         for pos_key, pos in self._positions.items():
-            mp  = self._market_prices.get(pos.symbol, pos.avg_price)
+            market_key = f"{pos.symbol}_{pos.instrument}"
+            mp  = self._market_prices.get(market_key, pos.avg_price)
             qty = abs(pos.lots) * self.lot_size
             direction = 1 if pos.lots > 0 else -1
             total += (mp - pos.avg_price) * qty * direction
