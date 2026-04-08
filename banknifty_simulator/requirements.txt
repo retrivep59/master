@@ -1,0 +1,30 @@
+# BankNifty Paper Trading Simulator - Dependencies
+# Core data & numerics
+yfinance>=0.2.40
+pandas>=2.2.0
+numpy>=1.26.0
+
+# NSE live data scraper (jugaad-data + nsetools fallback)
+jugaad-data>=0.26.0
+nsetools>=1.0.11
+
+# HTTP / scraping (used by jugaad-data internals & custom NSE fetcher)
+requests>=2.31.0
+lxml>=5.1.0
+beautifulsoup4>=4.12.0
+
+# Technical-analysis indicators (RSI, MACD, BB, EMA, etc.)
+pandas-ta>=0.3.14b
+
+# Scheduling – run the live-data loop at market open/close
+schedule>=1.2.1
+
+# Pretty console output for simulation reports
+tabulate>=0.9.0
+colorama>=0.4.6
+
+# Optional: lightweight ML for the signal agent
+scikit-learn>=1.4.0
+
+# Dev / testing
+pytest>=8.1.0
