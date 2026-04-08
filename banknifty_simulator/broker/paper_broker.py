@@ -525,6 +525,8 @@ class PaperBroker:
                 "lots":        t.lots,
                 "entry":       t.entry_price,
                 "exit":        t.exit_price,
+                "entry_fees":  t.entry_fees,
+                "exit_fees":   t.exit_fees,
                 "gross_pnl":   t.gross_pnl,
                 "net_pnl":     t.net_pnl,
                 "entry_time":  t.entry_time.isoformat(),
