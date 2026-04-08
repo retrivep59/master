@@ -121,9 +121,9 @@ class SimulationEngine:
         close = candle["close"]
         ts    = candle["timestamp"]
 
-        # Update market price so the broker knows current value
+        # FIX 17: use agent's instrument instead of hardcoding INSTRUMENT_FUTURES
         self.broker.update_market_price(
-            self.symbol, cfg.INSTRUMENT_FUTURES, close
+            self.symbol, self.agent.instrument, close
         )
 
         # Fill any pending limit orders at this candle's price
@@ -145,6 +145,10 @@ class SimulationEngine:
                 order_type  = "MARKET",
                 lots        = signal.lots,
             )
+            # FIX 18: sync agent state from broker after order fills
+            if order and order.status == "FILLED" and hasattr(self.agent, 'sync_state_from_broker'):
+                self.agent.sync_state_from_broker(self.broker)
+
             if self.verbose:
                 status = order.status
                 fill   = f"@ ₹{order.fill_price:.2f}  fees=₹{order.fees:.2f}" if status == "FILLED" else f"[{order.rejection_reason}]"

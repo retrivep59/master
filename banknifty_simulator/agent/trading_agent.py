@@ -34,7 +34,7 @@ from typing import Deque, List, Optional
 
 from collections import deque
 
-import config as cfg
+import config as _config
 
 logger = logging.getLogger(__name__)
 
@@ -78,8 +78,11 @@ class AgentConfig:
     daily_stop_loss_pct:    Optional[float] = None
     max_lots:               int             = 1
 
+    # --- Trailing stop-loss ---
+    trailing_stop_pts: float = 50.0   # 50 index points for futures
+
     # --- Minimum candles before issuing any signal ---
-    warmup_candles: int = 30
+    warmup_candles: int = 12
 
 
 # ---------------------------------------------------------------------------
@@ -134,16 +137,19 @@ def _macd(
     slow: int = 26,
     signal_period: int = 9,
 ) -> tuple[float, float, float]:
-    """Returns (macd_line, signal_line, histogram)."""
-    if len(prices) < slow:
+    """Returns (macd_line, signal_line, histogram). Incremental EMA avoids O(n²)."""
+    if len(prices) < slow + signal_period:
         return (0.0, 0.0, 0.0)
-    macd_line    = _ema(prices, fast) - _ema(prices, slow)
-    macd_history = [
-        _ema(prices[: i+1], fast) - _ema(prices[: i+1], slow)
-        for i in range(slow - 1, len(prices))
+    macd_line = _ema(prices, fast) - _ema(prices, slow)
+    # Build signal line from last (signal_period * 3) MACD values for stability
+    window = min(len(prices), slow + signal_period * 3)
+    recent = prices[-window:]
+    macd_vals = [
+        _ema(recent[:i+1], fast) - _ema(recent[:i+1], slow)
+        for i in range(slow - 1, len(recent))
     ]
-    signal_line  = _ema(macd_history, signal_period) if len(macd_history) >= signal_period else macd_line
-    histogram    = macd_line - signal_line
+    signal_line = _ema(macd_vals, signal_period) if len(macd_vals) >= signal_period else (macd_vals[-1] if macd_vals else 0.0)
+    histogram = macd_line - signal_line
     return (macd_line, signal_line, histogram)
 
 
@@ -164,21 +170,24 @@ class BankNiftyAgent:
 
     def __init__(
         self,
-        cfg: AgentConfig = AgentConfig(),
+        cfg: Optional[AgentConfig] = None,
         symbol: str = "BANKNIFTY-FUT",
         instrument: str = "FUTURES",
     ) -> None:
-        self.cfg        = cfg
+        self.cfg        = cfg if cfg is not None else AgentConfig()
         self.symbol     = symbol
         self.instrument = instrument
 
         # Rolling price history (close prices)
-        self._closes: Deque[float] = deque(maxlen=max(cfg.ema_slow, cfg.bb_period, cfg.rsi_period) * 3)
+        self._closes: Deque[float] = deque(maxlen=max(self.cfg.ema_slow, self.cfg.bb_period, self.cfg.rsi_period) * 3)
         self._candle_count: int    = 0
 
         # Track whether we are currently long / short
         self._in_long:  bool = False
         self._in_short: bool = False
+
+        # FIX 12: peak unrealised P&L for trailing stop tracking
+        self._peak_pnl: float = 0.0
 
         # Indicator snapshot of the last candle (for reporting)
         self.last_indicators: dict = {}
@@ -186,6 +195,12 @@ class BankNiftyAgent:
     # ------------------------------------------------------------------
     # Main entry point – called by the simulation engine each candle
     # ------------------------------------------------------------------
+
+    def sync_state_from_broker(self, broker) -> None:
+        """FIX 7: Reset _in_long/_in_short based on actual broker open positions."""
+        positions = broker.get_open_positions()
+        self._in_long  = any(p["lots"] > 0 for p in positions)
+        self._in_short = any(p["lots"] < 0 for p in positions)
 
     def on_candle(self, candle: dict, broker=None) -> Signal:
         """
@@ -196,10 +211,27 @@ class BankNiftyAgent:
         candle : dict with keys timestamp, open, high, low, close, volume
         broker : PaperBroker instance (used for position/balance awareness)
         """
+        from datetime import time as dtime
+        import pytz
+
         close = float(candle["close"])
         self._closes.append(close)
         self._candle_count += 1
         ts = candle.get("timestamp", datetime.now())
+
+        # FIX 7: sync long/short state from broker before any checks
+        if broker is not None:
+            self.sync_state_from_broker(broker)
+
+        # FIX 13: session filter – only trade within NSE market hours (09:15–15:30 IST)
+        IST = pytz.timezone("Asia/Kolkata")
+        if hasattr(ts, 'tzinfo'):
+            ts_ist = ts.astimezone(IST) if ts.tzinfo else ts.replace(tzinfo=pytz.utc).astimezone(IST)
+        else:
+            ts_ist = ts
+        t = ts_ist.time() if hasattr(ts_ist, 'time') else dtime(10, 0)
+        if t < dtime(9, 15) or t >= dtime(15, 30):
+            return Signal("HOLD", self.instrument, reason="outside market hours", timestamp=ts)
 
         # Not enough data for reliable signals yet
         if self._candle_count < self.cfg.warmup_candles:
@@ -233,14 +265,32 @@ class BankNiftyAgent:
         # Check risk limits from the broker
         if broker:
             summary = broker.get_account_summary()
-            max_trades = self.cfg.max_trades_per_day or cfg_module_val("MAX_TRADES_PER_DAY")
+            max_trades = self.cfg.max_trades_per_day or _config.MAX_TRADES_PER_DAY
             if summary["trades_today"] >= max_trades:
                 return Signal("HOLD", self.instrument, reason="max trades/day hit", timestamp=ts)
 
-            dsl_pct = self.cfg.daily_stop_loss_pct or cfg_module_val("DAILY_STOP_LOSS_PCT")
+            dsl_pct = self.cfg.daily_stop_loss_pct or _config.DAILY_STOP_LOSS_PCT
             daily_loss_limit = summary["starting_balance"] * dsl_pct
             if summary["realised_pnl_today"] < -daily_loss_limit:
                 return Signal("HOLD", self.instrument, reason="daily stop-loss hit", timestamp=ts)
+
+        # FIX 12: trailing stop-loss check
+        if broker:
+            positions = broker.get_open_positions()
+            for pos in positions:
+                cur = pos["current_price"]
+                avg = pos["avg_price"]
+                lots = pos["lots"]
+                unrealised = (cur - avg) * abs(lots) * broker.lot_size * (1 if lots > 0 else -1)
+                if unrealised > self._peak_pnl:
+                    self._peak_pnl = unrealised
+                # If we've given back more than trailing_stop from peak, exit
+                if self._peak_pnl > 0 and (self._peak_pnl - unrealised) > self.cfg.trailing_stop_pts * abs(lots) * broker.lot_size:
+                    self._peak_pnl = 0.0
+                    self._in_long  = False
+                    self._in_short = False
+                    return Signal("SELL" if lots > 0 else "BUY", self.instrument,
+                                 lots=abs(lots), reason="Trailing stop triggered", timestamp=ts)
 
         return self._compute_signal(
             ema_fast_val, ema_slow_val, prev_ef, prev_es,
@@ -277,10 +327,12 @@ class BankNiftyAgent:
                 self._in_long  = True
                 self._in_short = False
                 confidence = self._score_bull(rsi, macd_hist, close, bb_lower, bb_upper)
+                # FIX 11: scale lots with confidence
+                lots = max(1, round(self.cfg.max_lots * confidence))
                 return Signal(
                     action     = "BUY",
                     instrument = self.instrument,
-                    lots       = self.cfg.max_lots,
+                    lots       = lots,
                     reason     = f"EMA-cross UP | RSI={rsi:.1f} | MACD_hist={macd_hist:.2f}",
                     confidence = confidence,
                     timestamp  = ts,
@@ -289,7 +341,7 @@ class BankNiftyAgent:
         # --- SHORT / close-long exit ---
         if self._in_long and (
             bearish_cross
-            or rsi > self.cfg.rsi_overbought
+            or rsi > self.cfg.rsi_overbought   # FIX 8: compare against overbought
             or close < bb_lower
         ):
             self._in_long = False
@@ -305,7 +357,7 @@ class BankNiftyAgent:
         # --- SHORT entry (bearish) ---
         if (
             bearish_cross
-            and rsi > self.cfg.rsi_oversold
+            and rsi > self.cfg.rsi_overbought   # FIX 8: overbought threshold, not oversold
             and macd_hist < 0
             and not self._in_short
         ):
@@ -313,10 +365,12 @@ class BankNiftyAgent:
                 self._in_short = True
                 self._in_long  = False
                 confidence = self._score_bear(rsi, macd_hist, close, bb_upper)
+                # FIX 11: scale lots with confidence
+                lots = max(1, round(self.cfg.max_lots * confidence))
                 return Signal(
                     action     = "SELL",
                     instrument = self.instrument,
-                    lots       = self.cfg.max_lots,
+                    lots       = lots,
                     reason     = f"EMA-cross DOWN | RSI={rsi:.1f} | MACD_hist={macd_hist:.2f}",
                     confidence = confidence,
                     timestamp  = ts,
@@ -373,6 +427,7 @@ class BankNiftyAgent:
         self._candle_count = 0
         self._in_long      = False
         self._in_short     = False
+        self._peak_pnl     = 0.0
         self.last_indicators = {}
 
 
@@ -381,5 +436,4 @@ class BankNiftyAgent:
 # ---------------------------------------------------------------------------
 
 def cfg_module_val(attr: str):
-    import config as _cfg
-    return getattr(_cfg, attr)
+    return getattr(_config, attr)

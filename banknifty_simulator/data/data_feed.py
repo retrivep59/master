@@ -63,7 +63,13 @@ def _normalise(df: pd.DataFrame) -> pd.DataFrame:
         df.index = df.index.tz_localize("UTC")
     df.index = df.index.tz_convert(cfg.IST_TIMEZONE)
 
-    return df[["open", "high", "low", "close", "volume"]].sort_index()
+    df = df[["open", "high", "low", "close", "volume"]].sort_index()
+
+    # FIX 14: drop NaN rows and rows with zero/negative prices
+    df = df.dropna(subset=["open", "high", "low", "close"])
+    df = df[(df["close"] > 0) & (df["low"] > 0) & (df["open"] > 0)]
+
+    return df
 
 
 # ---------------------------------------------------------------------------
@@ -83,9 +89,15 @@ def _fetch_yfinance(symbol: str, interval: str, days: int) -> pd.DataFrame:
     ticker = yf.Ticker(symbol)
     df     = ticker.history(start=start, end=end, interval=interval, auto_adjust=True)
 
+    # FIX 15: retry with fallback symbol if first ticker returns empty data
+    if df.empty:
+        logger.warning("yfinance: %s returned empty data, retrying with BANKNIFTY.NS", symbol)
+        ticker2 = yf.Ticker("BANKNIFTY.NS")
+        df = ticker2.history(start=start, end=end, interval=interval, auto_adjust=True)
+
     if df.empty:
         raise RuntimeError(
-            f"yfinance returned empty data for {symbol}. "
+            f"yfinance returned empty data for {symbol} and BANKNIFTY.NS. "
             "For intraday data yfinance only provides ~60 days of 1m and ~730 days of 5m history."
         )
     return _normalise(df)
@@ -270,11 +282,25 @@ class BankNiftyFeed:
         df           : DataFrame to replay (uses cached data if None)
         speed_factor : seconds to sleep between candles (use 0 for max-speed backtest)
         """
+        from datetime import time as dtime
+        import pytz
+
+        IST = pytz.timezone("Asia/Kolkata")
+        MARKET_OPEN  = dtime(9, 15)
+        MARKET_CLOSE = dtime(15, 30)
+
         source_df = df if df is not None else self._cache
         if source_df is None:
             raise RuntimeError("No data loaded. Call fetch_historical() first.")
 
         for ts, row in source_df.iterrows():
+            # FIX 16: filter candles to NSE market hours
+            ts_ist = ts.astimezone(IST) if ts.tzinfo else ts
+            if hasattr(ts_ist, 'time'):
+                t = ts_ist.time()
+                if t < MARKET_OPEN or t >= MARKET_CLOSE:
+                    continue   # skip pre/post market candles
+
             candle = {
                 "timestamp": ts,
                 "open":      float(row["open"]),

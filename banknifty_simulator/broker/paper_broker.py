@@ -53,6 +53,7 @@ class Position:
     lots:       int          # positive = long, negative = short
     avg_price:  float
     open_time:  datetime
+    entry_fees: float = 0.0  # FIX 4: track cumulative entry fees per position
 
 
 @dataclass
@@ -198,8 +199,11 @@ class PaperBroker:
         self.balance:          float = starting_balance
         self.lot_size:         int   = lot_size
 
-        # Internal state
-        self._positions:    Dict[str, Position] = {}   # symbol → Position
+        # FIX 6: Initialise total reserved margin tracking
+        self._total_reserved_margin: float = 0.0
+
+        # FIX 3: positions keyed by f"{symbol}_{instrument}" to avoid collision
+        self._positions:    Dict[str, Position] = {}
         self._orders:       List[Order]          = []
         self._trades:       List[Trade]          = []
         self._market_prices: Dict[str, float]   = {}   # symbol → latest price
@@ -329,42 +333,57 @@ class PaperBroker:
     def _update_positions(
         self, order: Order, fill_price: float, fees: float
     ) -> None:
-        symbol = order.symbol
-        qty    = order.lots * self.lot_size
+        symbol     = order.symbol
+        instrument = order.instrument
+        qty        = order.lots * self.lot_size
 
-        if symbol not in self._positions:
+        # FIX 3: use composite key to avoid symbol+instrument collisions
+        pos_key = f"{symbol}_{instrument}"
+
+        if pos_key not in self._positions:
             # Opening a new position
             sign = 1 if order.action == "BUY" else -1
-            self._positions[symbol] = Position(
+            position = Position(
                 symbol     = symbol,
-                instrument = order.instrument,
+                instrument = instrument,
                 lots       = sign * order.lots,
                 avg_price  = fill_price,
                 open_time  = order.timestamp,
             )
+            # FIX 4: store entry fees on new position
+            position.entry_fees = fees
+            self._positions[pos_key] = position
+
             # Reserve margin from balance (simplified: notional × 10 % for futures)
-            if order.instrument == cfg.INSTRUMENT_FUTURES:
+            if instrument == cfg.INSTRUMENT_FUTURES:
                 notional = fill_price * qty
                 margin   = notional * 0.10          # ~10 % SPAN margin proxy
                 self.balance -= margin
+                # FIX 5: track reserved margin
+                self._total_reserved_margin += margin
         else:
-            pos = self._positions[symbol]
+            pos = self._positions[pos_key]
             incoming_lots = order.lots if order.action == "BUY" else -order.lots
 
             if (pos.lots > 0 and incoming_lots < 0) or (pos.lots < 0 and incoming_lots > 0):
                 # Closing / reducing position
-                closing_lots = min(abs(pos.lots), abs(incoming_lots))
-                exit_qty     = closing_lots * self.lot_size
+                closing_lots     = min(abs(pos.lots), abs(incoming_lots))
+                exit_qty         = closing_lots * self.lot_size
+                lots_before_close = abs(pos.lots)  # FIX 4: capture before modification
 
                 if pos.instrument == cfg.INSTRUMENT_FUTURES:
                     gross_pnl = (fill_price - pos.avg_price) * exit_qty * (1 if pos.lots > 0 else -1)
-                    # Release margin
-                    self.balance += fill_price * exit_qty * 0.10
+                    # FIX 1: release margin at ENTRY avg_price, not exit fill_price
+                    released_margin = pos.avg_price * exit_qty * 0.10
+                    self.balance += released_margin
+                    # FIX 5: reduce total reserved margin
+                    self._total_reserved_margin -= released_margin
                 else:
                     gross_pnl = (fill_price - pos.avg_price) * exit_qty * (1 if pos.lots > 0 else -1)
 
-                # Entry fees were already paid; account for them in net P&L
-                net_pnl = gross_pnl  # exit fees already deducted above
+                # FIX 4: proportional share of entry fees for this closing leg
+                proportional_entry_fees = pos.entry_fees * (closing_lots / lots_before_close)
+                net_pnl = gross_pnl - proportional_entry_fees  # exit fees already deducted above
 
                 self.balance          += gross_pnl
                 self._realised_pnl_today += net_pnl
@@ -377,7 +396,7 @@ class PaperBroker:
                     lots        = closing_lots,
                     entry_price = pos.avg_price,
                     exit_price  = fill_price,
-                    entry_fees  = 0.0,  # already deducted at entry
+                    entry_fees  = round(proportional_entry_fees, 2),  # FIX 4
                     exit_fees   = fees,
                     gross_pnl   = round(gross_pnl, 2),
                     net_pnl     = round(net_pnl,   2),
@@ -388,9 +407,11 @@ class PaperBroker:
 
                 remaining = pos.lots + incoming_lots
                 if remaining == 0:
-                    del self._positions[symbol]
+                    del self._positions[pos_key]
                 else:
                     pos.lots = remaining
+                    # FIX 4: reduce entry_fees proportionally for the remaining position
+                    pos.entry_fees -= proportional_entry_fees
             else:
                 # Adding to position (average down/up)
                 total_lots  = abs(pos.lots) + abs(incoming_lots)
@@ -399,6 +420,15 @@ class PaperBroker:
                     / total_lots
                 )
                 pos.lots += incoming_lots
+                # FIX 4: accumulate entry fees when averaging
+                pos.entry_fees += fees
+
+                # FIX 2: reserve additional margin when averaging into futures
+                if instrument == cfg.INSTRUMENT_FUTURES:
+                    additional_margin = fill_price * abs(incoming_lots) * self.lot_size * 0.10
+                    self.balance -= additional_margin
+                    # FIX 5: track reserved margin
+                    self._total_reserved_margin += additional_margin
 
     # ------------------------------------------------------------------
     # Risk management guards
@@ -431,19 +461,24 @@ class PaperBroker:
     def get_account_summary(self) -> dict:
         """Return a snapshot of the current virtual account state."""
         unrealised_pnl = self._calc_unrealised_pnl()
-        total_pnl      = (self.balance - self.starting_balance) + unrealised_pnl
+        # FIX 5: exclude reserved margin from balance difference so P&L is not distorted
+        realised_pnl   = (self.balance - self.starting_balance) + self._total_reserved_margin
+        total_pnl      = realised_pnl + unrealised_pnl
 
         return {
-            "balance":             round(self.balance,             2),
-            "starting_balance":    round(self.starting_balance,    2),
-            "unrealised_pnl":      round(unrealised_pnl,           2),
-            "realised_pnl_today":  round(self._realised_pnl_today, 2),
-            "total_pnl":           round(total_pnl,                2),
+            "balance":             round(self.balance,                    2),
+            "starting_balance":    round(self.starting_balance,           2),
+            "unrealised_pnl":      round(unrealised_pnl,                  2),
+            "realised_pnl_today":  round(self._realised_pnl_today,        2),
+            "total_pnl":           round(total_pnl,                       2),
             "total_pnl_pct":       round(total_pnl / self.starting_balance * 100, 3),
             "open_positions":      len(self._positions),
             "trades_today":        self._trades_today,
             "total_trades":        len(self._trades),
             "total_fees_paid":     round(sum(o.fees for o in self._orders if o.status == "FILLED"), 2),
+            # FIX 5: expose reserved margin and available balance
+            "reserved_margin":     round(self._total_reserved_margin,     2),
+            "available_balance":   round(self.balance,                    2),
         }
 
     def get_open_positions(self) -> List[dict]:
@@ -479,8 +514,8 @@ class PaperBroker:
 
     def _calc_unrealised_pnl(self) -> float:
         total = 0.0
-        for sym, pos in self._positions.items():
-            mp = self._market_prices.get(sym, pos.avg_price)
+        for pos_key, pos in self._positions.items():
+            mp  = self._market_prices.get(pos.symbol, pos.avg_price)
             qty = abs(pos.lots) * self.lot_size
             direction = 1 if pos.lots > 0 else -1
             total += (mp - pos.avg_price) * qty * direction
