@@ -29,5 +29,9 @@ colorama>=0.4.6
 # Optional: lightweight ML for the signal agent
 scikit-learn>=1.4.0
 
+# ── TUI Dashboard ──────────────────────────────────────────────────────────
+textual>=0.61.0
+rich>=13.7.0
+
 # Dev / testing
 pytest>=8.1.0
