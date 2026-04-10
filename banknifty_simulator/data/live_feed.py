@@ -92,7 +92,7 @@ def _yf_direct(symbol: str, interval: str, days: int) -> pd.DataFrame:
             f"?interval={interval}&range={yf_range}"
         )
         try:
-            resp = requests.get(url, headers=_HEADERS, timeout=12)
+            resp = requests.get(url, headers=_HEADERS, timeout=(5, 10))
             resp.raise_for_status()
             data = resp.json()
         except Exception as exc:
@@ -148,11 +148,11 @@ def _nse_live_quote() -> Optional[dict]:
     session = requests.Session()
     try:
         # Seed NSE session cookie
-        session.get("https://www.nseindia.com/", headers=_HEADERS, timeout=8)
+        session.get("https://www.nseindia.com/", headers=_HEADERS, timeout=(4, 6))
         resp = session.get(
             "https://www.nseindia.com/api/allIndices",
             headers={**_HEADERS, "Referer": "https://www.nseindia.com/"},
-            timeout=8,
+            timeout=(4, 6),
         )
         resp.raise_for_status()
         for entry in resp.json().get("data", []):

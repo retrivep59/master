@@ -889,13 +889,14 @@ def _run_live(capital: float, days: int, speed: float,
     STATE.mode = "BACKTEST" if backtest else "LIVE"
     STATE.start_bal = capital
     STATE.mkt_status = "OPEN"
-    STATE.status_msg = "Fetching data from Yahoo Finance…"
+    STATE.status_msg = "Fetching data from Yahoo Finance… (max ~15 s)"
 
     try:
         feed = LiveFeed(interval="5m")
         hist_df = feed.fetch_history(days=days)
     except Exception as exc:
-        STATE.status_msg = f"Data fetch failed: {exc}"
+        STATE.status_msg = f"Yahoo Finance unavailable ({exc.__class__.__name__}) — switching to DEMO"
+        _run_demo(capital, speed, instrument_key)
         return
 
     broker = PaperBroker(starting_balance=capital, seed=42)
@@ -1036,37 +1037,33 @@ def main() -> None:
         epilog=__doc__,
     )
     parser.add_argument("--demo",       action="store_true",
-                        help="Run with synthetic GARCH data (no internet needed)")
+                        help="Synthetic GARCH data — starts instantly, no internet (DEFAULT)")
     parser.add_argument("--backtest",   action="store_true",
-                        help="Replay real Yahoo Finance data at speed")
+                        help="Replay Yahoo Finance data; auto-falls back to demo if unavailable")
+    parser.add_argument("--live",       action="store_true",
+                        help="Live NSE polling every 5 min; auto-falls back to demo if unavailable")
     parser.add_argument("--capital",    type=float, default=500_000)
     parser.add_argument("--instrument", default="FUTURES", choices=["FUTURES","CE","PE"])
     parser.add_argument("--days",       type=int,   default=5,
                         help="Days of history to fetch/replay (backtest/live)")
-    parser.add_argument("--speed",      type=float, default=3.0,
-                        help="Candle replay speed multiplier (demo/backtest)")
+    parser.add_argument("--speed",      type=float, default=2.0,
+                        help="Candle replay speed multiplier — 1=realtime, 5=5× faster (demo/backtest)")
     args = parser.parse_args()
 
-    # Set initial values
     STATE.start_bal = args.capital
     STATE.balance   = args.capital
 
-    # Choose and launch background worker thread
-    if args.demo or (not args.backtest):
-        target = _run_demo
-        kwargs = dict(capital=args.capital, speed=args.speed,
-                      instrument_key=args.instrument)
-        if not args.demo:
-            target = _run_live
-            kwargs = dict(capital=args.capital, days=args.days,
-                          speed=args.speed, instrument_key=args.instrument,
-                          backtest=False)
-    else:
+    # Determine mode: demo is default unless --backtest or --live explicitly given
+    if args.backtest:
         target = _run_live
         kwargs = dict(capital=args.capital, days=args.days, speed=args.speed,
                       instrument_key=args.instrument, backtest=True)
-
-    if args.demo:
+    elif args.live:
+        target = _run_live
+        kwargs = dict(capital=args.capital, days=args.days, speed=args.speed,
+                      instrument_key=args.instrument, backtest=False)
+    else:
+        # Default: demo mode — instant start, no network needed
         target = _run_demo
         kwargs = dict(capital=args.capital, speed=args.speed,
                       instrument_key=args.instrument)
