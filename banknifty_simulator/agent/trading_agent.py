@@ -87,6 +87,13 @@ class AgentConfig:
     use_regime_filter: bool  = True
     min_atr_ratio:     float = 0.7   # ATR14 / ATR50 must be >= this
 
+    # Scalp mode — high-frequency intraday trading
+    # When True: relaxes triple-EMA alignment requirement, uses faster exits,
+    # enables fixed profit target and hard stop (point-based, per index point).
+    scalp_mode:        bool  = False
+    profit_target_pts: float = 0.0   # take-profit in BankNifty index points (0 = disabled)
+    hard_stop_pts:     float = 0.0   # hard stop-loss in index points (0 = disabled)
+
     # Warmup: need EMA50, ATR50, stable MACD (26+9), Supertrend (7×5)
     warmup_candles: int = 60
 
@@ -396,6 +403,39 @@ class BankNiftyAgent:
             if summ["realised_pnl_today"] < -(summ["starting_balance"] * dsl):
                 return Signal("HOLD", self.instrument, reason="daily stop-loss hit", timestamp=ts)
 
+        # ── Profit target & hard stop (scalp exits) ──────────────────────
+        if broker and (self.cfg.profit_target_pts > 0 or self.cfg.hard_stop_pts > 0):
+            for pos in broker.get_open_positions():
+                if pos["symbol"] != self.symbol:
+                    continue
+                cur_p  = float(pos["current_price"])
+                avg_p  = float(pos["avg_price"])
+                lots   = int(pos["lots"])
+                dirn   = 1 if lots > 0 else -1
+                pts    = (cur_p - avg_p) * dirn   # unrealised index points
+
+                if self.cfg.profit_target_pts > 0 and pts >= self.cfg.profit_target_pts:
+                    self._in_long  = False
+                    self._in_short = False
+                    action = "SELL" if lots > 0 else "BUY"
+                    return Signal(
+                        action, pos["instrument"],
+                        lots=abs(lots),
+                        reason=f"Take-profit +{pts:.0f}pts (target={self.cfg.profit_target_pts:.0f})",
+                        timestamp=ts,
+                    )
+
+                if self.cfg.hard_stop_pts > 0 and pts <= -self.cfg.hard_stop_pts:
+                    self._in_long  = False
+                    self._in_short = False
+                    action = "SELL" if lots > 0 else "BUY"
+                    return Signal(
+                        action, pos["instrument"],
+                        lots=abs(lots),
+                        reason=f"Hard stop {pts:.0f}pts (limit=-{self.cfg.hard_stop_pts:.0f})",
+                        timestamp=ts,
+                    )
+
         # ── ATR trailing stop ─────────────────────────────────────────────
         if broker:
             for pos in broker.get_open_positions():
@@ -479,58 +519,104 @@ class BankNiftyAgent:
                 return Signal("BUY", self.instrument, lots=self.cfg.max_lots,
                               reason=reason, confidence=0.75, timestamp=ts)
 
-        # ── Regime gate ───────────────────────────────────────────────────
-        if not trending:
+        # ── Regime gate (swing only; scalpers trade all conditions) ──────
+        if not self.cfg.scalp_mode and not trending:
             return Signal("HOLD", self.instrument, reason="choppy/ranging market", timestamp=ts)
 
-        # ── Long entry ────────────────────────────────────────────────────
         rsi_ok = self.cfg.rsi_oversold < rsi < self.cfg.rsi_overbought
-        if (
-            st_bull
-            and ema_aligned_up
-            and rsi_ok
-            and macd_hist > 0
-            and close > ema_t
-            and not self._in_long
-            and not self._in_short
-        ):
-            conf = self._score_bull(rsi, macd_hist, close, bb_lower, bb_upper,
-                                    st_flip_bull, ema_f, ema_s, ema_t)
-            self._in_long = True
-            return Signal(
-                action     = "BUY",
-                instrument = self.instrument,
-                lots       = max(1, round(self.cfg.max_lots * conf)),
-                reason     = (f"ST↑ EMA{self.cfg.ema_fast}>{self.cfg.ema_slow}>{self.cfg.ema_trend} "
-                              f"RSI={rsi:.0f} MACD={macd_hist:+.2f} ATR={atr_val:.0f}"),
-                confidence = conf,
-                timestamp  = ts,
-            )
 
-        # ── Short entry ───────────────────────────────────────────────────
-        if (
-            not st_bull
-            and ema_aligned_dn
-            and rsi_ok
-            and macd_hist < 0
-            and close < ema_t
-            and not self._in_short
-            and not self._in_long
-        ):
-            conf = self._score_bear(rsi, macd_hist, close, bb_upper,
-                                    st_flip_bear, ema_f, ema_s, ema_t)
-            self._in_short = True
-            return Signal(
-                action     = "SELL",
-                instrument = self.instrument,
-                lots       = max(1, round(self.cfg.max_lots * conf)),
-                reason     = (f"ST↓ EMA{self.cfg.ema_fast}<{self.cfg.ema_slow}<{self.cfg.ema_trend} "
-                              f"RSI={rsi:.0f} MACD={macd_hist:+.2f} ATR={atr_val:.0f}"),
-                confidence = conf,
-                timestamp  = ts,
-            )
+        if self.cfg.scalp_mode:
+            # ── SCALP long: fast EMA cross up + Supertrend bullish + RSI ok ──
+            # No triple-alignment needed — react to every fast momentum shift
+            if (
+                bull_cross
+                and st_bull
+                and rsi_ok
+                and macd_hist > 0
+                and not self._in_long
+                and not self._in_short
+            ):
+                conf = self._score_bull(rsi, macd_hist, close, bb_lower, bb_upper,
+                                        st_flip_bull, ema_f, ema_s, ema_t)
+                self._in_long = True
+                return Signal(
+                    action     = "BUY",
+                    instrument = self.instrument,
+                    lots       = max(1, round(self.cfg.max_lots * conf)),
+                    reason     = f"SCALP↑ EMA{self.cfg.ema_fast}×{self.cfg.ema_slow} RSI={rsi:.0f} MACD={macd_hist:+.2f}",
+                    confidence = conf,
+                    timestamp  = ts,
+                )
 
-        return Signal("HOLD", self.instrument, reason="no high-probability setup", timestamp=ts)
+            # ── SCALP short: fast EMA cross down + Supertrend bearish ────────
+            if (
+                bear_cross
+                and not st_bull
+                and rsi_ok
+                and macd_hist < 0
+                and not self._in_short
+                and not self._in_long
+            ):
+                conf = self._score_bear(rsi, macd_hist, close, bb_upper,
+                                        st_flip_bear, ema_f, ema_s, ema_t)
+                self._in_short = True
+                return Signal(
+                    action     = "SELL",
+                    instrument = self.instrument,
+                    lots       = max(1, round(self.cfg.max_lots * conf)),
+                    reason     = f"SCALP↓ EMA{self.cfg.ema_fast}×{self.cfg.ema_slow} RSI={rsi:.0f} MACD={macd_hist:+.2f}",
+                    confidence = conf,
+                    timestamp  = ts,
+                )
+
+        else:
+            # ── SWING long: full triple-EMA alignment + Supertrend ────────────
+            if (
+                st_bull
+                and ema_aligned_up
+                and rsi_ok
+                and macd_hist > 0
+                and close > ema_t
+                and not self._in_long
+                and not self._in_short
+            ):
+                conf = self._score_bull(rsi, macd_hist, close, bb_lower, bb_upper,
+                                        st_flip_bull, ema_f, ema_s, ema_t)
+                self._in_long = True
+                return Signal(
+                    action     = "BUY",
+                    instrument = self.instrument,
+                    lots       = max(1, round(self.cfg.max_lots * conf)),
+                    reason     = (f"ST↑ EMA{self.cfg.ema_fast}>{self.cfg.ema_slow}>{self.cfg.ema_trend} "
+                                  f"RSI={rsi:.0f} MACD={macd_hist:+.2f} ATR={atr_val:.0f}"),
+                    confidence = conf,
+                    timestamp  = ts,
+                )
+
+            # ── SWING short ───────────────────────────────────────────────────
+            if (
+                not st_bull
+                and ema_aligned_dn
+                and rsi_ok
+                and macd_hist < 0
+                and close < ema_t
+                and not self._in_short
+                and not self._in_long
+            ):
+                conf = self._score_bear(rsi, macd_hist, close, bb_upper,
+                                        st_flip_bear, ema_f, ema_s, ema_t)
+                self._in_short = True
+                return Signal(
+                    action     = "SELL",
+                    instrument = self.instrument,
+                    lots       = max(1, round(self.cfg.max_lots * conf)),
+                    reason     = (f"ST↓ EMA{self.cfg.ema_fast}<{self.cfg.ema_slow}<{self.cfg.ema_trend} "
+                                  f"RSI={rsi:.0f} MACD={macd_hist:+.2f} ATR={atr_val:.0f}"),
+                    confidence = conf,
+                    timestamp  = ts,
+                )
+
+        return Signal("HOLD", self.instrument, reason="no setup", timestamp=ts)
 
     # ── Confidence scorers ────────────────────────────────────────────────────
 

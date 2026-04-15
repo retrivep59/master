@@ -119,18 +119,22 @@ def main() -> None:
     parser.add_argument("--interval",   default="5m", choices=["1m", "2m", "5m", "15m", "30m", "1h"])
     parser.add_argument("--days",       type=int,   default=5,      help="History days to warm up agent")
     parser.add_argument("--backtest",   action="store_true",        help="Replay history only, no live poll")
+    parser.add_argument("--scalp",      action="store_true",        help="Scalp mode: fast EMAs, profit target, hard stop")
     parser.add_argument("--quiet",      action="store_true")
     args = parser.parse_args()
 
     instrument = INSTRUMENT_MAP[args.instrument]
     symbol     = f"BANKNIFTY-{args.instrument}"
     verbose    = not args.quiet
+    mode_label = ("SCALP" if args.scalp else "SWING") + ("-BACKTEST" if args.backtest else "-LIVE")
 
     print(f"\n{'═'*65}")
-    print(f"  BankNifty Live Paper-Trading")
+    print(f"  BankNifty Paper-Trading")
     print(f"  Capital    : ₹{args.capital:>10,.0f}")
     print(f"  Instrument : {args.instrument}  ({symbol})")
-    print(f"  Interval   : {args.interval}    Mode: {'BACKTEST' if args.backtest else 'LIVE'}")
+    print(f"  Interval   : {args.interval}    Mode: {mode_label}")
+    if args.scalp:
+        print(f"  Scalp      : EMA 5/13  TP=+25pts  SL=-15pts  Up to 20 trades/day")
     print(f"{'═'*65}\n")
 
     # ── 1. Fetch history ───────────────────────────────────────────────
@@ -152,18 +156,51 @@ def main() -> None:
 
     # ── 2. Initialise broker + agent ───────────────────────────────────
     broker = PaperBroker(starting_balance=args.capital, seed=42)
-    agent  = BankNiftyAgent(
-        cfg        = AgentConfig(
+
+    if args.scalp:
+        # ── Scalp config: fast EMAs, profit target, hard stop ─────────
+        agent_cfg = AgentConfig(
+            # Fast indicators for more signal frequency
+            ema_fast           = 5,
+            ema_slow           = 13,
+            ema_trend          = 21,
+            rsi_period         = 7,
+            supertrend_period  = 5,
+            supertrend_mult    = 2.0,
+            macd_fast          = 5,
+            macd_slow          = 13,
+            macd_signal        = 5,
+            atr_period         = 7,
+            # Scalp entry/exit parameters
+            scalp_mode         = True,
+            profit_target_pts  = 25.0,   # exit when up 25 BankNifty points
+            hard_stop_pts      = 15.0,   # exit when down 15 BankNifty points
+            trailing_stop_pts  = 20.0,   # tight trailing stop
+            atr_trailing_multiplier = 0.5,
+            # Relaxed filters for high frequency
+            rsi_oversold       = 40.0,
+            rsi_overbought     = 60.0,
+            use_regime_filter  = False,  # trade all market conditions
+            skip_open_candles  = 1,      # only skip 09:15 candle
+            skip_close_candles = 1,
+            # Fast warmup + allow many trades
+            warmup_candles     = 20,
+            max_lots           = args.lots,
+            daily_stop_loss_pct = 0.04,
+            max_trades_per_day = 20,
+        )
+    else:
+        # ── Swing config: Supertrend + triple EMA alignment ───────────
+        agent_cfg = AgentConfig(
             warmup_candles      = 60,
             max_lots            = args.lots,
             trailing_stop_pts   = max(args.trailing, 100.0),
             daily_stop_loss_pct = 0.05,
             rsi_oversold        = 35.0,
             rsi_overbought      = 65.0,
-        ),
-        symbol     = symbol,
-        instrument = instrument,
-    )
+        )
+
+    agent = BankNiftyAgent(cfg=agent_cfg, symbol=symbol, instrument=instrument)
 
     # ── 3. Warm-up replay ──────────────────────────────────────────────
     logger.info("Warming up agent on %d historical candles ...", len(hist_df))
