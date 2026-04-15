@@ -538,7 +538,8 @@ class BankNiftySentinel(App):
 # Background worker — Demo mode (synthetic GARCH-lite candles + live agent)
 # ══════════════════════════════════════════════════════════════════════════
 
-def _run_demo(capital: float, speed: float, instrument_key: str = "FUTURES") -> None:
+def _run_demo(capital: float, speed: float, instrument_key: str = "FUTURES",
+              scalp: bool = False) -> None:
     """Generate synthetic BankNifty candles and run the real trading engine."""
     import time as _time
 
@@ -554,21 +555,9 @@ def _run_demo(capital: float, speed: float, instrument_key: str = "FUTURES") -> 
     instrument = inst_map.get(instrument_key, cfg.INSTRUMENT_FUTURES)
     symbol = f"BANKNIFTY-{instrument_key}"
 
-    broker = PaperBroker(starting_balance=capital, seed=42)
-    agent = BankNiftyAgent(
-        cfg=AgentConfig(
-            warmup_candles=20,
-            max_lots=1,
-            trailing_stop_pts=50.0,
-            daily_stop_loss_pct=0.02,
-            rsi_oversold=30.0,
-            rsi_overbought=70.0,
-        ),
-        symbol=symbol,
-        instrument=instrument,
-    )
+    broker, agent = _make_broker_agent(capital, symbol, instrument, scalp=scalp)
 
-    STATE.mode = "DEMO"
+    STATE.mode = "SCALP-DEMO" if scalp else "DEMO"
     STATE.start_bal = capital
     STATE.mkt_status = "DEMO"
 
@@ -978,17 +967,28 @@ def _push_to_state(
     STATE.status_msg   = status_msg
 
 
-def _make_broker_agent(capital: float, symbol: str, instrument: str):
+def _make_broker_agent(capital: float, symbol: str, instrument: str, scalp: bool = False):
     broker = PaperBroker(starting_balance=capital, seed=42)
-    agent  = BankNiftyAgent(
-        cfg=AgentConfig(
+    if scalp:
+        agent_cfg = AgentConfig(
+            ema_fast=5, ema_slow=13, ema_trend=21,
+            rsi_period=7, supertrend_period=5, supertrend_mult=2.0,
+            macd_fast=5, macd_slow=13, macd_signal=5, atr_period=7,
+            scalp_mode=True, profit_target_pts=25.0, hard_stop_pts=15.0,
+            trailing_stop_pts=20.0, atr_trailing_multiplier=0.5,
+            rsi_oversold=40.0, rsi_overbought=60.0,
+            use_regime_filter=False, skip_open_candles=1, skip_close_candles=1,
+            warmup_candles=20, max_lots=1, daily_stop_loss_pct=0.04,
+            max_trades_per_day=20,
+        )
+    else:
+        agent_cfg = AgentConfig(
             warmup_candles=60, max_lots=1,
             trailing_stop_pts=100.0,
             rsi_overbought=65.0, rsi_oversold=35.0,
             daily_stop_loss_pct=0.05,
-        ),
-        symbol=symbol, instrument=instrument,
-    )
+        )
+    agent = BankNiftyAgent(cfg=agent_cfg, symbol=symbol, instrument=instrument)
     return broker, agent
 
 
@@ -1016,21 +1016,21 @@ def _feed_candle(candle: dict, broker, agent, symbol: str, instrument: str):
 # ══════════════════════════════════════════════════════════════════════════
 
 def _run_backtest(capital: float, days: int, speed: float,
-                  instrument_key: str = "FUTURES") -> None:
+                  instrument_key: str = "FUTURES", scalp: bool = False) -> None:
     import time as _time
     if not HAS_TRADING:
-        _run_demo(capital, speed, instrument_key); return
+        _run_demo(capital, speed, instrument_key, scalp=scalp); return
     try:
         from data.live_feed import LiveFeed
     except ImportError:
-        _run_demo(capital, speed, instrument_key); return
+        _run_demo(capital, speed, instrument_key, scalp=scalp); return
 
     inst_map   = {"FUTURES": cfg.INSTRUMENT_FUTURES,
                   "CE": cfg.INSTRUMENT_CALL, "PE": cfg.INSTRUMENT_PUT}
     instrument = inst_map.get(instrument_key, cfg.INSTRUMENT_FUTURES)
     symbol     = f"BANKNIFTY-{instrument_key}"
 
-    STATE.mode      = "BACKTEST"
+    STATE.mode      = "SCALP-BT" if scalp else "BACKTEST"
     STATE.start_bal = capital
     STATE.status_msg = f"Fetching {days}-day history from Yahoo Finance…"
 
@@ -1039,9 +1039,9 @@ def _run_backtest(capital: float, days: int, speed: float,
         hist_df = feed.fetch_history(days=days)
     except Exception as exc:
         STATE.status_msg = f"Fetch failed ({exc.__class__.__name__}) — switching to DEMO"
-        _run_demo(capital, speed, instrument_key); return
+        _run_demo(capital, speed, instrument_key, scalp=scalp); return
 
-    broker, agent = _make_broker_agent(capital, symbol, instrument)
+    broker, agent = _make_broker_agent(capital, symbol, instrument, scalp=scalp)
     ind = _IndicatorState()
     day_open = price_high = price_low = 0.0
 
@@ -1071,7 +1071,7 @@ def _run_backtest(capital: float, days: int, speed: float,
 # ══════════════════════════════════════════════════════════════════════════
 
 def _run_live_trading(capital: float, instrument_key: str = "FUTURES",
-                      warmup_days: int = 1) -> None:
+                      warmup_days: int = 1, scalp: bool = False) -> None:
     """
     Proper live paper trading:
       1. Fetch 3 days of 5-min history → replay at 20× for fast warmup
@@ -1092,7 +1092,7 @@ def _run_live_trading(capital: float, instrument_key: str = "FUTURES",
     instrument = inst_map.get(instrument_key, cfg.INSTRUMENT_FUTURES)
     symbol     = f"BANKNIFTY-{instrument_key}"
 
-    STATE.mode      = "LIVE"
+    STATE.mode      = "SCALP-LIVE" if scalp else "LIVE"
     STATE.start_bal = capital
     STATE.mkt_status = "OPEN"
 
@@ -1103,9 +1103,9 @@ def _run_live_trading(capital: float, instrument_key: str = "FUTURES",
         hist_df = feed_5m.fetch_history(days=warmup_days)
     except Exception as exc:
         STATE.status_msg = f"Yahoo Finance unreachable ({exc.__class__.__name__}) — switching to DEMO"
-        _run_demo(capital, 2.0, instrument_key); return
+        _run_demo(capital, 2.0, instrument_key, scalp=scalp); return
 
-    broker, agent = _make_broker_agent(capital, symbol, instrument)
+    broker, agent = _make_broker_agent(capital, symbol, instrument, scalp=scalp)
     ind = _IndicatorState()
     day_open = price_high = price_low = 0.0
 
@@ -1239,26 +1239,25 @@ def main() -> None:
                         help="Days of history to fetch for agent warmup in --live mode")
     parser.add_argument("--speed",      type=float, default=2.0,
                         help="Replay speed multiplier for --demo / --backtest (default: 2)")
+    parser.add_argument("--scalp",      action="store_true",
+                        help="Scalp mode: EMA 5/13, profit target +25pts, hard stop -15pts, up to 20 trades/day")
     args = parser.parse_args()
 
     STATE.start_bal = args.capital
     STATE.balance   = args.capital
 
     if args.live:
-        # Live paper trading with real Yahoo Finance data
         target = _run_live_trading
         kwargs = dict(capital=args.capital, instrument_key=args.instrument,
-                      warmup_days=args.warmup)
+                      warmup_days=args.warmup, scalp=args.scalp)
     elif args.backtest:
-        # Replay historical data at speed
         target = _run_backtest
         kwargs = dict(capital=args.capital, days=args.days, speed=args.speed,
-                      instrument_key=args.instrument)
+                      instrument_key=args.instrument, scalp=args.scalp)
     else:
-        # Default: demo (instant, no network)
         target = _run_demo
         kwargs = dict(capital=args.capital, speed=args.speed,
-                      instrument_key=args.instrument)
+                      instrument_key=args.instrument, scalp=args.scalp)
 
     worker = threading.Thread(target=target, kwargs=kwargs, daemon=True)
     worker.start()
