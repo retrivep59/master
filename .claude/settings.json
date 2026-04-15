@@ -1,0 +1,17 @@
+{
+  "hooks": {
+    "SubagentStart": [
+      {
+        "type": "command",
+        "command": "node .claude/hooks/subagent-start.js"
+      }
+    ],
+    "Stop": [
+      {
+        "type": "command",
+        "command": "node .claude/hooks/on-stop.js",
+        "async": true
+      }
+    ]
+  }
+}
