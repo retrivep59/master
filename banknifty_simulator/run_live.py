@@ -154,12 +154,12 @@ def main() -> None:
     broker = PaperBroker(starting_balance=args.capital, seed=42)
     agent  = BankNiftyAgent(
         cfg        = AgentConfig(
-            warmup_candles      = 12,
+            warmup_candles      = 50,
             max_lots            = args.lots,
-            trailing_stop_pts   = args.trailing,
-            daily_stop_loss_pct = 0.03,
-            rsi_oversold        = 30.0,
-            rsi_overbought      = 70.0,
+            trailing_stop_pts   = max(args.trailing, 100.0),
+            daily_stop_loss_pct = 0.05,
+            rsi_oversold        = 35.0,
+            rsi_overbought      = 65.0,
         ),
         symbol     = symbol,
         instrument = instrument,

@@ -741,7 +741,7 @@ def _run_demo(capital: float, speed: float, instrument_key: str = "FUTURES") -> 
         STATE.avg_win    = avg_w
         STATE.avg_loss   = avg_l
         STATE.candles    = candle_idx + 1
-        STATE.warmup_done = agent._warmup_candle_count >= agent.cfg.warmup_candles
+        STATE.warmup_done = agent._candle_count >= agent.cfg.warmup_candles
         STATE.status_msg  = f"{'LIVE AGENT' if STATE.warmup_done else 'WARMING UP'} — q to quit"
 
         price = c
@@ -909,7 +909,14 @@ def _push_to_state(
     o  = candle["open"]
     ts = candle["timestamp"]
 
-    rsi, macd_h, bb_up, bb_lo = ind.update(o, c)
+    # Use agent.last_indicators — same values agent used for its decision
+    last_ind = getattr(agent, 'last_indicators', {}) or {}
+    rsi    = last_ind.get('rsi',       0.0)
+    macd_h = last_ind.get('macd_hist', 0.0)
+    bb_up  = last_ind.get('bb_upper',  c * 1.02)
+    bb_lo  = last_ind.get('bb_lower',  c * 0.98)
+    ema_f  = last_ind.get('ema_fast',  c)
+    ema_s  = last_ind.get('ema_slow',  c)
 
     summ        = broker.get_account_summary()
     open_pos    = broker.get_open_positions()
@@ -959,7 +966,7 @@ def _push_to_state(
     if signal.action in ("BUY", "SELL") and order and order.status == "FILLED":
         STATE.sig_entry = order.fill_price
     STATE.rsi       = rsi;   STATE.macd_hist = macd_h
-    STATE.ema_fast  = ind.ema9;  STATE.ema_slow  = ind.ema21
+    STATE.ema_fast  = ema_f; STATE.ema_slow  = ema_s
     STATE.bb_upper  = bb_up; STATE.bb_lower  = bb_lo
     STATE.in_pos    = in_pos;    STATE.pos_side  = pos_side
     STATE.pos_entry = pos_entry; STATE.pos_lots  = pos_lots
@@ -967,15 +974,19 @@ def _push_to_state(
     STATE.avg_win   = sum(t["net_pnl"] for t in wins)     / max(len(wins),     1)
     STATE.avg_loss  = sum(t["net_pnl"] for t in losses_t) / max(len(losses_t), 1)
     STATE.candles   = candle_idx + 1
-    STATE.warmup_done  = agent._warmup_candle_count >= agent.cfg.warmup_candles
+    STATE.warmup_done  = agent._candle_count >= agent.cfg.warmup_candles
     STATE.status_msg   = status_msg
 
 
 def _make_broker_agent(capital: float, symbol: str, instrument: str):
     broker = PaperBroker(starting_balance=capital, seed=42)
     agent  = BankNiftyAgent(
-        cfg=AgentConfig(warmup_candles=20, max_lots=1,
-                        trailing_stop_pts=50.0, daily_stop_loss_pct=0.02),
+        cfg=AgentConfig(
+            warmup_candles=50, max_lots=1,
+            trailing_stop_pts=100.0,
+            rsi_overbought=65.0, rsi_oversold=35.0,
+            daily_stop_loss_pct=0.05,
+        ),
         symbol=symbol, instrument=instrument,
     )
     return broker, agent
@@ -1060,7 +1071,7 @@ def _run_backtest(capital: float, days: int, speed: float,
 # ══════════════════════════════════════════════════════════════════════════
 
 def _run_live_trading(capital: float, instrument_key: str = "FUTURES",
-                      warmup_days: int = 3) -> None:
+                      warmup_days: int = 1) -> None:
     """
     Proper live paper trading:
       1. Fetch 3 days of 5-min history → replay at 20× for fast warmup
@@ -1109,7 +1120,8 @@ def _run_live_trading(capital: float, instrument_key: str = "FUTURES",
         price_high = max(price_high, candle["high"])
         price_low  = min(price_low,  candle["low"])
         signal, order = _feed_candle(candle, broker, agent, symbol, instrument)
-        msg = f"⟳ Warming up {idx+1}/{len(hist_df)} — real trading starts after warmup"
+        msg = (f"⟳ Warming up {idx+1}/{len(hist_df)} — "
+               f"{'✓ ready' if agent._candle_count >= agent.cfg.warmup_candles else 'real trading starts after warmup'}")
         _push_to_state(candle, signal, order, broker, agent, ind,
                        capital, symbol, day_open, price_high, price_low, idx, msg)
         _time.sleep(0.05)   # 20× speed
