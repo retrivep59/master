@@ -982,7 +982,7 @@ def _make_broker_agent(capital: float, symbol: str, instrument: str):
     broker = PaperBroker(starting_balance=capital, seed=42)
     agent  = BankNiftyAgent(
         cfg=AgentConfig(
-            warmup_candles=50, max_lots=1,
+            warmup_candles=60, max_lots=1,
             trailing_stop_pts=100.0,
             rsi_overbought=65.0, rsi_oversold=35.0,
             daily_stop_loss_pct=0.05,

@@ -115,7 +115,7 @@ def main() -> None:
     parser.add_argument("--capital",    type=float, default=500_000, help="Starting virtual capital (INR)")
     parser.add_argument("--instrument", default="FUTURES", choices=["FUTURES", "CE", "PE"])
     parser.add_argument("--lots",       type=int,   default=1)
-    parser.add_argument("--trailing",   type=float, default=50.0,   help="Trailing stop points")
+    parser.add_argument("--trailing",   type=float, default=100.0,  help="Trailing stop floor points")
     parser.add_argument("--interval",   default="5m", choices=["1m", "2m", "5m", "15m", "30m", "1h"])
     parser.add_argument("--days",       type=int,   default=5,      help="History days to warm up agent")
     parser.add_argument("--backtest",   action="store_true",        help="Replay history only, no live poll")
@@ -154,7 +154,7 @@ def main() -> None:
     broker = PaperBroker(starting_balance=args.capital, seed=42)
     agent  = BankNiftyAgent(
         cfg        = AgentConfig(
-            warmup_candles      = 50,
+            warmup_candles      = 60,
             max_lots            = args.lots,
             trailing_stop_pts   = max(args.trailing, 100.0),
             daily_stop_loss_pct = 0.05,
