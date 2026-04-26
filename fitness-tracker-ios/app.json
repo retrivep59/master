@@ -1,0 +1,44 @@
+{
+  "expo": {
+    "name": "FitTrack",
+    "slug": "fitness-tracker-ios",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "scheme": "fittrack",
+    "userInterfaceStyle": "dark",
+    "backgroundColor": "#0A0F1E",
+    "icon": "./assets/icon.png",
+    "splash": {
+      "backgroundColor": "#0A0F1E"
+    },
+    "ios": {
+      "bundleIdentifier": "com.yourorg.fittrack",
+      "supportsTablet": false,
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "FitTrack uses your location to track your route.",
+        "NSMotionUsageDescription": "FitTrack uses motion sensors to count your steps.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "FitTrack tracks your route during active sessions."
+      }
+    },
+    "android": {
+      "package": "com.yourorg.fittrack",
+      "permissions": [
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "ACTIVITY_RECOGNITION"
+      ]
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Allow FitTrack to track your route."
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}
